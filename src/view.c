@@ -158,6 +158,137 @@ static inline int window_node_get_gap(struct view *view)
     return view_check_flag(view, VIEW_ENABLE_GAP) ? view->window_gap : 0;
 }
 
+static inline bool view_is_scroll_layout(struct view *view)
+{
+    return view->layout == VIEW_SCROLL;
+}
+
+static inline int scroll_column_count(struct view *view)
+{
+    return buf_len(view->scroll.column_list);
+}
+
+static int scroll_view_find_column_index(struct view *view, uint32_t window_id)
+{
+    for (int i = 0; i < scroll_column_count(view); ++i) {
+        if (view->scroll.column_list[i].window_id == window_id) return i;
+    }
+
+    return -1;
+}
+
+static float scroll_view_total_width(struct view *view)
+{
+    int count = scroll_column_count(view);
+    if (!count) return 0.0f;
+
+    struct scroll_column *last = &view->scroll.column_list[count - 1];
+    return last->x + last->w;
+}
+
+static int scroll_view_focus_index_after_removal(int count, int removed_index)
+{
+    int next_count = count - 1;
+    if (next_count <= 0) return -1;
+    if (removed_index < next_count) return removed_index;
+    return next_count - 1;
+}
+
+static void scroll_view_center_on_index(struct view *view, int index)
+{
+    int count = scroll_column_count(view);
+    if (!count || !in_range_ie(index, 0, count)) {
+        view->scroll.viewport_x = 0.0f;
+        view->scroll.focused_index = -1;
+        return;
+    }
+
+    struct scroll_column *column = &view->scroll.column_list[index];
+    float max_viewport_x = max(0.0f, scroll_view_total_width(view) - view->scroll.area.w);
+    float viewport_x = column->x + (column->w * 0.5f) - (view->scroll.area.w * 0.5f);
+    view->scroll.viewport_x = clampf_range(viewport_x, 0.0f, max_viewport_x);
+    view->scroll.focused_index = index;
+}
+
+static float scroll_view_adjust_window_x(struct scroll_view *scroll, struct scroll_column *column)
+{
+    float fx = scroll->area.x + column->x - scroll->viewport_x;
+    float area_min_x = scroll->area.x;
+    float area_max_x = scroll->area.x + scroll->area.w;
+
+    if (fx + column->w <= area_min_x) {
+        fx = area_min_x - column->w + VIEW_SCROLL_EDGE_PEEK;
+    } else if (fx >= area_max_x) {
+        fx = area_max_x - VIEW_SCROLL_EDGE_PEEK;
+    }
+
+    return fx;
+}
+
+static void scroll_view_update(struct view *view)
+{
+    uint32_t did = space_display_id(view->sid);
+    CGRect frame = display_bounds_constrained(did, false);
+    view->scroll.area = area_from_cgrect(frame);
+
+    if (view_check_flag(view, VIEW_ENABLE_PADDING)) {
+        view->scroll.area.x += view->left_padding;
+        view->scroll.area.w -= (view->left_padding + view->right_padding);
+        view->scroll.area.y += view->top_padding;
+        view->scroll.area.h -= (view->top_padding + view->bottom_padding);
+    }
+
+    float default_width = max(1.0f, floorf(view->scroll.area.w * g_space_manager.split_ratio));
+    int gap = window_node_get_gap(view);
+    float x = 0.0f;
+
+    for (int i = 0; i < scroll_column_count(view); ++i) {
+        struct scroll_column *column = &view->scroll.column_list[i];
+        if (column->width < 1.0f) column->width = default_width;
+
+        column->x = x;
+        column->y = 0.0f;
+        column->w = column->width;
+        column->h = view->scroll.area.h;
+        x += column->w + gap;
+    }
+
+    if (!scroll_column_count(view)) {
+        view->scroll.viewport_x = 0.0f;
+        view->scroll.focused_index = -1;
+    } else if (!in_range_ie(view->scroll.focused_index, 0, scroll_column_count(view))) {
+        int index = view->scroll.focused_index < 0 ? 0 : scroll_column_count(view) - 1;
+        scroll_view_center_on_index(view, index);
+    } else {
+        scroll_view_center_on_index(view, view->scroll.focused_index);
+    }
+
+    view_set_flag(view, VIEW_IS_VALID);
+    view_set_flag(view, VIEW_IS_DIRTY);
+}
+
+static void scroll_view_capture_windows(struct view *view, struct window_capture **window_list)
+{
+    for (int i = 0; i < scroll_column_count(view); ++i) {
+        struct scroll_column *column = &view->scroll.column_list[i];
+        struct window *window = window_manager_find_window(&g_window_manager, column->window_id);
+        if (!window) continue;
+
+        float fx = scroll_view_adjust_window_x(&view->scroll, column);
+        float fy = view->scroll.area.y + column->y;
+        float fw = column->w;
+        float fh = column->h;
+
+        ts_buf_push(*window_list, ((struct window_capture) {
+            .window = window,
+            .x = fx,
+            .y = fy,
+            .w = fw,
+            .h = fh
+        }));
+    }
+}
+
 static void area_make_pair(enum window_node_split split, int gap, float ratio, struct area *parent_area, struct area *left_area, struct area *right_area)
 {
     if (split == SPLIT_Y) {
@@ -611,6 +742,8 @@ struct window_node *view_find_window_node_in_direction(struct view *view, struct
 
 struct window_node *view_find_window_node(struct view *view, uint32_t window_id)
 {
+    if (view_is_scroll_layout(view)) return NULL;
+
     for (struct window_node *node = window_node_find_first_leaf(view->root); node; node = window_node_find_next_leaf(node)) {
         if (window_node_contains_window(node, window_id)) return node;
     }
@@ -620,6 +753,28 @@ struct window_node *view_find_window_node(struct view *view, uint32_t window_id)
 
 struct window_node *view_remove_window_node(struct view *view, struct window *window)
 {
+    if (view_is_scroll_layout(view)) {
+        int index = scroll_view_find_column_index(view, window->id);
+        if (index == -1) return NULL;
+
+        int count = scroll_column_count(view);
+        if (index < count - 1) {
+            memmove(view->scroll.column_list + index,
+                    view->scroll.column_list + index + 1,
+                    sizeof(struct scroll_column) * (count - index - 1));
+        }
+        buf__hdr(view->scroll.column_list)->len--;
+
+        view->scroll.focused_index = scroll_view_focus_index_after_removal(count, index);
+
+        if (view->insertion_point == window->id) {
+            view->insertion_point = view->scroll.focused_index >= 0 ? view->scroll.column_list[view->scroll.focused_index].window_id : 0;
+        }
+
+        scroll_view_update(view);
+        return NULL;
+    }
+
     struct window_node *node = view_find_window_node(view, window->id);
     if (!node) return NULL;
 
@@ -750,6 +905,37 @@ void view_stack_window_node(struct window_node *node, struct window *window)
 
 struct window_node *view_add_window_node_with_insertion_point(struct view *view, struct window *window, uint32_t insertion_point)
 {
+    if (view_is_scroll_layout(view)) {
+        struct scroll_column column = {
+            .window_id = window->id,
+            .width = max(1.0f, floorf(view->scroll.area.w * g_space_manager.split_ratio)),
+        };
+
+        int insert_index = scroll_column_count(view);
+        if (insertion_point) {
+            int index = scroll_view_find_column_index(view, insertion_point);
+            if (index != -1) insert_index = index + 1;
+        } else if (g_space_manager.window_insertion_point == INSERT_FIRST) {
+            insert_index = 0;
+        } else if (g_space_manager.window_insertion_point == INSERT_FOCUSED && view->scroll.focused_index >= 0) {
+            insert_index = view->scroll.focused_index + 1;
+        }
+
+        buf__fit(view->scroll.column_list, 1);
+        if (insert_index < scroll_column_count(view)) {
+            memmove(view->scroll.column_list + insert_index + 1,
+                    view->scroll.column_list + insert_index,
+                    sizeof(struct scroll_column) * (scroll_column_count(view) - insert_index));
+        }
+
+        view->scroll.column_list[insert_index] = column;
+        buf__hdr(view->scroll.column_list)->len++;
+        view->scroll.focused_index = insert_index;
+        scroll_view_update(view);
+        view->insertion_point = window->id;
+        return NULL;
+    }
+
     if (!window_node_is_occupied(view->root) &&
         window_node_is_leaf(view->root)) {
         view->root->window_list[0] = window->id;
@@ -820,6 +1006,18 @@ uint32_t *view_find_window_list(struct view *view, int *window_count)
 {
     *window_count = 0;
 
+    if (view_is_scroll_layout(view)) {
+        int count = scroll_column_count(view);
+        if (!count) return NULL;
+
+        uint32_t *window_list = ts_alloc_list(uint32_t, count);
+        for (int i = 0; i < count; ++i) {
+            window_list[(*window_count)++] = view->scroll.column_list[i].window_id;
+        }
+
+        return window_list;
+    }
+
     int capacity = 13;
     uint32_t *window_list = ts_alloc_list(uint32_t, capacity);
 
@@ -837,6 +1035,165 @@ uint32_t *view_find_window_list(struct view *view, int *window_count)
     return window_list;
 }
 
+int view_find_window_index(struct view *view, uint32_t window_id)
+{
+    if (view_is_scroll_layout(view)) {
+        return scroll_view_find_column_index(view, window_id);
+    }
+
+    int index = 0;
+    for (struct window_node *node = window_node_find_first_leaf(view->root); node; node = window_node_find_next_leaf(node)) {
+        for (int i = 0; i < node->window_count; ++i, ++index) {
+            if (node->window_list[i] == window_id) return index;
+        }
+    }
+
+    return -1;
+}
+
+uint32_t view_find_prev_window_id(struct view *view, uint32_t window_id)
+{
+    if (view_is_scroll_layout(view)) {
+        int index = scroll_view_find_column_index(view, window_id);
+        return index > 0 ? view->scroll.column_list[index - 1].window_id : 0;
+    }
+
+    struct window_node *node = view_find_window_node(view, window_id);
+    struct window_node *prev = node ? window_node_find_prev_leaf(node) : NULL;
+    return prev ? prev->window_order[0] : 0;
+}
+
+uint32_t view_find_next_window_id(struct view *view, uint32_t window_id)
+{
+    if (view_is_scroll_layout(view)) {
+        int index = scroll_view_find_column_index(view, window_id);
+        return index != -1 && in_range_ie(index + 1, 0, scroll_column_count(view)) ? view->scroll.column_list[index + 1].window_id : 0;
+    }
+
+    struct window_node *node = view_find_window_node(view, window_id);
+    struct window_node *next = node ? window_node_find_next_leaf(node) : NULL;
+    return next ? next->window_order[0] : 0;
+}
+
+uint32_t view_find_first_window_id(struct view *view)
+{
+    if (view_is_scroll_layout(view)) {
+        return scroll_column_count(view) ? view->scroll.column_list[0].window_id : 0;
+    }
+
+    struct window_node *first = window_node_find_first_leaf(view->root);
+    return first ? first->window_order[0] : 0;
+}
+
+uint32_t view_find_last_window_id(struct view *view)
+{
+    if (view_is_scroll_layout(view)) {
+        int count = scroll_column_count(view);
+        return count ? view->scroll.column_list[count - 1].window_id : 0;
+    }
+
+    struct window_node *last = window_node_find_last_leaf(view->root);
+    return last ? last->window_order[0] : 0;
+}
+
+bool view_swap_window_order(struct view *view, uint32_t a_id, uint32_t b_id)
+{
+    if (!view_is_scroll_layout(view)) return false;
+
+    int a_index = scroll_view_find_column_index(view, a_id);
+    int b_index = scroll_view_find_column_index(view, b_id);
+    if (a_index == -1 || b_index == -1) return false;
+
+    struct scroll_column tmp = view->scroll.column_list[a_index];
+    view->scroll.column_list[a_index] = view->scroll.column_list[b_index];
+    view->scroll.column_list[b_index] = tmp;
+
+    if (view->scroll.focused_index == a_index) {
+        view->scroll.focused_index = b_index;
+    } else if (view->scroll.focused_index == b_index) {
+        view->scroll.focused_index = a_index;
+    }
+
+    scroll_view_update(view);
+    return true;
+}
+
+bool view_warp_window_order(struct view *view, uint32_t a_id, uint32_t b_id)
+{
+    if (!view_is_scroll_layout(view)) return false;
+
+    int a_index = scroll_view_find_column_index(view, a_id);
+    int b_index = scroll_view_find_column_index(view, b_id);
+    if (a_index == -1 || b_index == -1 || a_index == b_index) return false;
+
+    struct scroll_column column = view->scroll.column_list[a_index];
+    if (a_index < scroll_column_count(view) - 1) {
+        memmove(view->scroll.column_list + a_index,
+                view->scroll.column_list + a_index + 1,
+                sizeof(struct scroll_column) * (scroll_column_count(view) - a_index - 1));
+    }
+    buf__hdr(view->scroll.column_list)->len--;
+
+    if (a_index < b_index) --b_index;
+
+    buf__fit(view->scroll.column_list, 1);
+    if (b_index < scroll_column_count(view)) {
+        memmove(view->scroll.column_list + b_index + 1,
+                view->scroll.column_list + b_index,
+                sizeof(struct scroll_column) * (scroll_column_count(view) - b_index));
+    }
+    view->scroll.column_list[b_index] = column;
+    buf__hdr(view->scroll.column_list)->len++;
+
+    view->scroll.focused_index = b_index;
+    scroll_view_update(view);
+    return true;
+}
+
+bool view_resize_window(struct view *view, uint32_t window_id, int direction, float dx, float dy)
+{
+    if (!view_is_scroll_layout(view)) return false;
+    if ((direction & (HANDLE_TOP|HANDLE_BOTTOM)) || direction == HANDLE_ABS) return false;
+    (void) dy;
+
+    int index = scroll_view_find_column_index(view, window_id);
+    if (index == -1) return false;
+
+    struct scroll_column *column = &view->scroll.column_list[index];
+    float delta = (direction & HANDLE_LEFT) ? -dx : dx;
+    column->width = max(1.0f, column->width + delta);
+    scroll_view_update(view);
+    return true;
+}
+
+bool view_set_focused_window(struct view *view, uint32_t window_id)
+{
+    if (!view_is_scroll_layout(view)) return false;
+
+    int index = scroll_view_find_column_index(view, window_id);
+    if (index == -1) return false;
+
+    scroll_view_center_on_index(view, index);
+    view_set_flag(view, VIEW_IS_DIRTY);
+    return true;
+}
+
+bool view_scroll_step(struct view *view, int direction)
+{
+    if (!view_is_scroll_layout(view)) return false;
+    if (!scroll_column_count(view)) return false;
+
+    int index = view->scroll.focused_index;
+    if (!in_range_ie(index, 0, scroll_column_count(view))) index = 0;
+    if (direction == DIR_EAST) ++index;
+    if (direction == DIR_WEST) --index;
+    if (!in_range_ie(index, 0, scroll_column_count(view))) return false;
+
+    scroll_view_center_on_index(view, index);
+    view_set_flag(view, VIEW_IS_DIRTY);
+    return true;
+}
+
 bool view_is_invalid(struct view *view)
 {
     return !view_check_flag(view, VIEW_IS_VALID);
@@ -850,7 +1207,13 @@ bool view_is_dirty(struct view *view)
 void view_flush(struct view *view)
 {
     if (space_is_visible(view->sid)) {
-        window_node_flush(view->root);
+        if (view_is_scroll_layout(view)) {
+            struct window_capture *window_list = NULL;
+            scroll_view_capture_windows(view, &window_list);
+            if (window_list) window_manager_animate_window_list(window_list, ts_buf_len(window_list));
+        } else {
+            window_node_flush(view->root);
+        }
         view_clear_flag(view, VIEW_IS_DIRTY);
     } else {
         view_set_flag(view, VIEW_IS_DIRTY);
@@ -929,16 +1292,14 @@ void view_serialize(FILE *rsp, struct view *view, uint64_t flags)
     if (flags & SPACE_PROPERTY_FIRST_WINDOW) {
         if (did_output) fprintf(rsp, ",\n");
 
-        struct window_node *first_leaf = window_node_find_first_leaf(view->root);
-        fprintf(rsp, "\t\"first-window\":%d", first_leaf ? first_leaf->window_order[0] : 0);
+        fprintf(rsp, "\t\"first-window\":%d", view_find_first_window_id(view));
         did_output = true;
     }
 
     if (flags & SPACE_PROPERTY_LAST_WINDOW) {
         if (did_output) fprintf(rsp, ",\n");
 
-        struct window_node *last_leaf = window_node_find_last_leaf(view->root);
-        fprintf(rsp, "\t\"last-window\":%d", last_leaf ? last_leaf->window_order[0] : 0);
+        fprintf(rsp, "\t\"last-window\":%d", view_find_last_window_id(view));
         did_output = true;
     }
 
@@ -967,6 +1328,11 @@ void view_serialize(FILE *rsp, struct view *view, uint64_t flags)
 
 void view_update(struct view *view)
 {
+    if (view_is_scroll_layout(view)) {
+        scroll_view_update(view);
+        return;
+    }
+
     uint32_t did = space_display_id(view->sid);
     CGRect frame = display_bounds_constrained(did, false);
     view->root->area = area_from_cgrect(frame);
@@ -993,6 +1359,7 @@ struct view *view_create(uint64_t sid)
 
     view->sid = sid;
     view->uuid = SLSSpaceCopyName(g_connection, sid);
+    view->scroll.focused_index = -1;
 
     view_set_flag(view, VIEW_ENABLE_PADDING);
     view_set_flag(view, VIEW_ENABLE_GAP);
@@ -1016,6 +1383,14 @@ struct view *view_create(uint64_t sid)
 
 void view_destroy(struct view *view)
 {
+    if (view->scroll.column_list) {
+        for (int i = 0; i < scroll_column_count(view); ++i) {
+            window_manager_remove_managed_window(&g_window_manager, view->scroll.column_list[i].window_id);
+        }
+        buf_free(view->scroll.column_list);
+        view->scroll.column_list = NULL;
+    }
+
     if (view->root) {
         if (view->root->left)  window_node_destroy(view->root->left);
         if (view->root->right) window_node_destroy(view->root->right);
@@ -1031,6 +1406,15 @@ void view_destroy(struct view *view)
 
 void view_clear(struct view *view)
 {
+    if (view->scroll.column_list) {
+        for (int i = 0; i < scroll_column_count(view); ++i) {
+            window_manager_remove_managed_window(&g_window_manager, view->scroll.column_list[i].window_id);
+        }
+        buf_free(view->scroll.column_list);
+        view->scroll.column_list = NULL;
+        view->scroll.focused_index = -1;
+    }
+
     if (view->root) {
         if (view->root->left)  window_node_destroy(view->root->left);
         if (view->root->right) window_node_destroy(view->root->right);

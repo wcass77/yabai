@@ -28,7 +28,7 @@ Synopsis
 Description
 -----------
 
-*yabai* is a tiling window manager for macOS based on binary space partitioning.
+*yabai* is a tiling window manager for macOS supporting binary space partitioning, stack, float, and horizontally scrollable workspaces.
 
 Options
 -------
@@ -227,8 +227,9 @@ Global Settings
 Space Settings
 ^^^^^^^^^^^^^^
 
-*layout* ['bsp|stack|float']::
+*layout* ['bsp|stack|float|scroll']::
     Set the layout of the selected space.
+    In *scroll* layout, managed windows are arranged as horizontal columns and the focused column is kept visible while the workspace scrolls.
 
 *split_type* ['vertical|horizontal|auto']::
     Specify how a window should be split. +
@@ -347,7 +348,7 @@ COMMAND
 *--toggle* 'padding|gap|mission-control|show-desktop'::
     Toggle space setting on or off for the selected space.
 
-*--layout* 'bsp|stack|float'::
+*--layout* 'bsp|stack|float|scroll'::
     Set the layout of the selected space.
 
 *--label* ['<LABEL>']::
@@ -392,10 +393,12 @@ COMMAND
     System Integrity Protection must be partially disabled on macOS Monterey 12.7+, Ventura 13.6+, Sonoma 14.5+, and macOS Sequoia.
 
 *--swap* '<WINDOW_SEL>'::
-    Swap position of the selected window and the given window.
+    Swap position of the selected window and the given window. +
+    On *scroll* spaces, this swaps column order.
 
 *--warp* '<WINDOW_SEL>'::
-    Re-insert the selected window, splitting the given window.
+    Re-insert the selected window, splitting the given window. +
+    On *scroll* spaces, this reorders the selected column relative to the given column.
 
 *--stack* '<WINDOW_SEL>'::
     Stack the given window on top of the selected window. +
@@ -403,7 +406,8 @@ COMMAND
 
 *--insert* '<DIR_SEL>|stack'::
     Set the splitting mode of the selected window. +
-    If the current splitting mode matches the selected mode, the action will be undone.
+    If the current splitting mode matches the selected mode, the action will be undone. +
+    Not supported on *scroll* spaces.
 
 *--grid* '<rows>:<cols>:<start-x>:<start-y>:<width>:<height>'::
     Set the frame of the selected window based on a self-defined grid.
@@ -414,15 +418,28 @@ COMMAND
 
 *--resize* 'top|left|bottom|right|top_left|top_right|bottom_right|bottom_left|abs:<dx>:<dy>'::
     Resize the selected window by moving the given handle 'dx' pixels horizontally and 'dy' pixels vertically. +
-    If handle is 'abs' the new size will be 'dx' width and 'dy' height and cannot be used on managed windows.
+    If handle is 'abs' the new size will be 'dx' width and 'dy' height and cannot be used on managed windows. +
+    On *scroll* spaces, only left/right resizing is supported.
 
 *--ratio* 'rel|abs:<dr>'::
     If type is 'rel' the split ratio of the selected window is changed by 'dr', otherwise 'dr' will become the new split ratio. +
-    A positive/negative delta will increase/decrease the size of the left-child.
+    A positive/negative delta will increase/decrease the size of the left-child. +
+    Not supported on *scroll* spaces.
 
 *--toggle* 'float|sticky|pip|shadow|split|zoom-parent|zoom-fullscreen|windowed-fullscreen|native-fullscreen|expose|<LABEL>'::
     Toggle the given property of the selected window. +
-    The following properties require System Integrity Protection to be partially disabled: sticky, pip, shadow, LABEL (scratchpad identifier) .
+    The following properties require System Integrity Protection to be partially disabled: sticky, pip, shadow, LABEL (scratchpad identifier) . +
+    The *split* toggle is not supported on *scroll* spaces.
+
+Trackpad Gestures
+~~~~~~~~~~~~~~~~~
+
+When the selected space uses the *scroll* layout, yabai can react to private trackpad multitouch callbacks:
+
+- three-finger horizontal swipe scrolls the current workspace by one column
+- four-finger horizontal swipe switches to the previous/next user space on the active display
+
+These gestures rely on private macOS APIs and do not suppress Dock's native gesture handling. Disable conflicting macOS trackpad gestures for switching spaces if you want reliable four-finger workspace switching.
 
 *--sub-layer* '<LAYER>'::
     Set the stacking sub-layer of the selected window. +

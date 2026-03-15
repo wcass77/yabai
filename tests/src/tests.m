@@ -12,11 +12,16 @@ typedef TEST_SIG(function);
 #define TEST_CHECK(r, e) if ((r) != (e)) { printf("                   \e[1;33m%s\e[m\e[1;31m#%d %s == %s\e[m \e[1;31m(%d == %d)\e[m\n", test_name, __LINE__, #r, #e, r, e); result = false; }
 
 #include "area.c"
+#include "scroll.c"
 
 #define TEST_ENTRY(name) { #name, test_##name },
 #define TEST_LIST                                              \
     TEST_ENTRY(display_area_is_in_direction)                   \
-    TEST_ENTRY(closest_display_in_direction)
+    TEST_ENTRY(closest_display_in_direction)                   \
+    TEST_ENTRY(scroll_window_order_navigation)                 \
+    TEST_ENTRY(scroll_viewport_centering_and_edge_peek)        \
+    TEST_ENTRY(scroll_focus_index_after_removal)               \
+    TEST_ENTRY(display_local_user_space_navigation)
 
 static struct {
     char *name;

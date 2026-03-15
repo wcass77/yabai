@@ -4,6 +4,7 @@ extern struct display_manager g_display_manager;
 extern struct space_manager g_space_manager;
 extern struct window_manager g_window_manager;
 extern struct mouse_state g_mouse_state;
+extern struct gesture_handler g_gesture_handler;
 extern enum mission_control_mode g_mission_control_mode;
 extern int g_connection;
 extern void *g_workspace_context;
@@ -52,6 +53,14 @@ static void window_did_receive_focus(struct window_manager *wm, struct mouse_sta
 
     struct view *view = window_manager_find_managed_window(&g_window_manager, window);
     if (!view) return;
+
+    if (view->layout == VIEW_SCROLL) {
+        view_set_focused_window(view, window->id);
+        if (space_is_visible(view->sid)) {
+            view_flush(view);
+        }
+        return;
+    }
 
     struct window_node *node = view_find_window_node(view, window->id);
     if (node->window_count <= 1) return;
@@ -234,8 +243,7 @@ static EVENT_HANDLER(APPLICATION_LAUNCHED)
         if (!space_is_visible(view->sid)) continue;
         if (!view_is_dirty(view))         continue;
 
-        window_node_flush(view->root);
-        view_clear_flag(view, VIEW_IS_DIRTY);
+        view_flush(view);
     }
 
     if (workspace_is_macos_sequoia() || workspace_is_macos_tahoe()) {
@@ -327,8 +335,7 @@ static EVENT_HANDLER(APPLICATION_TERMINATED)
         if (!space_is_visible(view->sid)) continue;
         if (!view_is_dirty(view))         continue;
 
-        window_node_flush(view->root);
-        view_clear_flag(view, VIEW_IS_DIRTY);
+        view_flush(view);
     }
 
     if (workspace_is_macos_sequoia() || workspace_is_macos_tahoe()) {
@@ -456,8 +463,7 @@ static EVENT_HANDLER(APPLICATION_VISIBLE)
         if (!space_is_visible(view->sid)) continue;
         if (!view_is_dirty(view))         continue;
 
-        window_node_flush(view->root);
-        view_clear_flag(view, VIEW_IS_DIRTY);
+        view_flush(view);
     }
 
     event_signal_push(SIGNAL_APPLICATION_VISIBLE, application);
@@ -517,8 +523,7 @@ static EVENT_HANDLER(APPLICATION_HIDDEN)
         if (!space_is_visible(view->sid)) continue;
         if (!view_is_dirty(view))         continue;
 
-        window_node_flush(view->root);
-        view_clear_flag(view, VIEW_IS_DIRTY);
+        view_flush(view);
     }
 
     event_signal_push(SIGNAL_APPLICATION_HIDDEN, application);
@@ -671,11 +676,17 @@ static EVENT_HANDLER(WINDOW_MOVED)
             struct view *view = window_manager_find_managed_window(&g_window_manager, window);
             if (view) {
                 struct window_node *node = view_find_window_node(view, window->id);
-                if (node && (AX_DIFF(node->area.x, new_origin.x) ||
-                             AX_DIFF(node->area.y, new_origin.y))
-                         &&
-                   (!node->zoom || AX_DIFF(node->zoom->area.x, new_origin.x) ||
-                                   AX_DIFF(node->zoom->area.y, new_origin.y))) {
+                if (view->layout == VIEW_SCROLL) {
+                    if (space_is_visible(view->sid)) {
+                        view_flush(view);
+                    } else {
+                        view_set_flag(view, VIEW_IS_DIRTY);
+                    }
+                } else if (node && (AX_DIFF(node->area.x, new_origin.x) ||
+                                    AX_DIFF(node->area.y, new_origin.y))
+                                &&
+                          (!node->zoom || AX_DIFF(node->zoom->area.x, new_origin.x) ||
+                                          AX_DIFF(node->zoom->area.y, new_origin.y))) {
                     if (space_is_visible(view->sid)) {
                         window_node_flush(node);
                     } else {
@@ -769,16 +780,22 @@ static EVENT_HANDLER(WINDOW_RESIZED)
             if (!g_mouse_state.window || g_mouse_state.window != window) {
                 struct view *view = window_manager_find_managed_window(&g_window_manager, window);
                 if (view) {
-                    struct window_node *node = view_find_window_node(view, window->id);
-                    if (node && (AX_DIFF(node->area.x, new_frame.origin.x)   ||
-                                 AX_DIFF(node->area.y, new_frame.origin.y)   ||
-                                 AX_DIFF(node->area.w, new_frame.size.width) ||
-                                 AX_DIFF(node->area.h, new_frame.size.height))
-                             &&
-                       (!node->zoom || AX_DIFF(node->zoom->area.x, new_frame.origin.x)   ||
-                                       AX_DIFF(node->zoom->area.y, new_frame.origin.y)   ||
-                                       AX_DIFF(node->zoom->area.w, new_frame.size.width) ||
-                                       AX_DIFF(node->zoom->area.h, new_frame.size.height))) {
+                struct window_node *node = view_find_window_node(view, window->id);
+                    if (view->layout == VIEW_SCROLL) {
+                        if (space_is_visible(view->sid)) {
+                            view_flush(view);
+                        } else {
+                            view_set_flag(view, VIEW_IS_DIRTY);
+                        }
+                    } else if (node && (AX_DIFF(node->area.x, new_frame.origin.x)   ||
+                                        AX_DIFF(node->area.y, new_frame.origin.y)   ||
+                                        AX_DIFF(node->area.w, new_frame.size.width) ||
+                                        AX_DIFF(node->area.h, new_frame.size.height))
+                                    &&
+                              (!node->zoom || AX_DIFF(node->zoom->area.x, new_frame.origin.x)   ||
+                                              AX_DIFF(node->zoom->area.y, new_frame.origin.y)   ||
+                                              AX_DIFF(node->zoom->area.w, new_frame.size.width) ||
+                                              AX_DIFF(node->zoom->area.h, new_frame.size.height))) {
                         if (space_is_visible(view->sid)) {
                             window_node_flush(node);
                         } else {
@@ -985,8 +1002,7 @@ static EVENT_HANDLER(SPACE_CHANGED)
         }
 
         if (view_is_dirty(view)) {
-            window_node_flush(view->root);
-            view_clear_flag(view, VIEW_IS_DIRTY);
+            view_flush(view);
         }
     }
 
@@ -1037,12 +1053,49 @@ static EVENT_HANDLER(DISPLAY_CHANGED)
         }
 
         if (view_is_dirty(view)) {
-            window_node_flush(view->root);
-            view_clear_flag(view, VIEW_IS_DIRTY);
+            view_flush(view);
         }
     }
 
     event_signal_push(SIGNAL_DISPLAY_CHANGED, NULL);
+}
+
+static EVENT_HANDLER(GESTURE_SCROLL_VIEW)
+{
+    uint32_t did = g_display_manager.current_display_id ? g_display_manager.current_display_id : display_manager_cursor_display_id();
+    if (!did) return;
+
+    uint64_t sid = display_space_id(did);
+    if (!sid) return;
+    if (mission_control_is_active()) return;
+    if (space_is_fullscreen(sid)) return;
+    if (display_manager_display_is_animating(did)) return;
+
+    struct view *view = space_manager_find_view(&g_space_manager, sid);
+    if (!view || view->layout != VIEW_SCROLL) return;
+
+    if (view_scroll_step(view, param1)) {
+        view_flush(view);
+    }
+}
+
+static EVENT_HANDLER(GESTURE_SWITCH_SPACE)
+{
+    uint32_t did = g_display_manager.current_display_id ? g_display_manager.current_display_id : display_manager_cursor_display_id();
+    if (!did) return;
+
+    uint64_t sid = display_space_id(did);
+    if (!sid) return;
+    if (mission_control_is_active()) return;
+    if (space_is_fullscreen(sid)) return;
+    if (display_manager_display_is_animating(did)) return;
+
+    uint64_t target_sid = 0;
+    if (param1 == DIR_WEST) target_sid = space_manager_prev_user_space_on_display(did, sid);
+    if (param1 == DIR_EAST) target_sid = space_manager_next_user_space_on_display(did, sid);
+    if (target_sid) {
+        space_manager_focus_space(target_sid);
+    }
 }
 
 static EVENT_HANDLER(DISPLAY_ADDED)
@@ -1051,6 +1104,7 @@ static EVENT_HANDLER(DISPLAY_ADDED)
     debug("%s: %d\n", __FUNCTION__, did);
     space_manager_handle_display_add(&g_space_manager, did);
     window_manager_handle_display_add_and_remove(&g_space_manager, &g_window_manager, did);
+    gesture_handler_refresh_devices(&g_gesture_handler);
     event_signal_push(SIGNAL_DISPLAY_ADDED, context);
 }
 
@@ -1060,6 +1114,7 @@ static EVENT_HANDLER(DISPLAY_REMOVED)
     debug("%s: %d\n", __FUNCTION__, did);
     display_manager_remove_label_for_display(&g_display_manager, did);
     window_manager_handle_display_add_and_remove(&g_space_manager, &g_window_manager, display_manager_main_display_id());
+    gesture_handler_refresh_devices(&g_gesture_handler);
     event_signal_push(SIGNAL_DISPLAY_REMOVED, context);
 }
 
@@ -1512,6 +1567,7 @@ static EVENT_HANDLER(DOCK_DID_RESTART)
         mission_control_observe();
     }
 
+    gesture_handler_refresh_devices(&g_gesture_handler);
     event_signal_push(SIGNAL_DOCK_DID_RESTART, NULL);
 }
 
@@ -1567,6 +1623,7 @@ static EVENT_HANDLER(SYSTEM_WOKE)
         window_manager_center_mouse(&g_window_manager, focused_window);
     }
 
+    gesture_handler_refresh_devices(&g_gesture_handler);
     event_signal_push(SIGNAL_SYSTEM_WOKE, NULL);
 }
 

@@ -71,6 +71,7 @@ extern bool g_verbose;
 #define ARGUMENT_CONFIG_LAYOUT_BSP            "bsp"
 #define ARGUMENT_CONFIG_LAYOUT_STACK          "stack"
 #define ARGUMENT_CONFIG_LAYOUT_FLOAT          "float"
+#define ARGUMENT_CONFIG_LAYOUT_SCROLL         "scroll"
 #define ARGUMENT_CONFIG_SPLIT_TYPE_Y          "vertical"
 #define ARGUMENT_CONFIG_SPLIT_TYPE_X          "horizontal"
 #define ARGUMENT_CONFIG_SPLIT_TYPE_AUTO       "auto"
@@ -124,6 +125,7 @@ extern bool g_verbose;
 #define ARGUMENT_SPACE_LAYOUT_BSP   "bsp"
 #define ARGUMENT_SPACE_LAYOUT_STACK "stack"
 #define ARGUMENT_SPACE_LAYOUT_FLT   "float"
+#define ARGUMENT_SPACE_LAYOUT_SCROLL "scroll"
 /* ----------------------------------------------------------------------------- */
 
 /* --------------------------------DOMAIN WINDOW-------------------------------- */
@@ -1511,6 +1513,15 @@ static void handle_domain_config(FILE *rsp, struct token domain, char *message)
                     } else {
                         daemon_fail(rsp, "cannot set layout for a macOS fullscreen space!\n");
                     }
+                } else if (token_equals(value, ARGUMENT_CONFIG_LAYOUT_SCROLL)) {
+                    if (space_is_user(sel_sid)) {
+                        view_set_flag(view, VIEW_LAYOUT);
+                        view->layout = VIEW_SCROLL;
+                        view_clear(view);
+                        window_manager_validate_and_check_for_windows_on_space(&g_space_manager, &g_window_manager, sel_sid);
+                    } else {
+                        daemon_fail(rsp, "cannot set layout for a macOS fullscreen space!\n");
+                    }
                 } else {
                     daemon_fail(rsp, "unknown value '%.*s' given to command '%.*s' for domain '%.*s'\n", value.length, value.text, command.length, command.text, domain.length, domain.text);
                 }
@@ -1523,6 +1534,8 @@ static void handle_domain_config(FILE *rsp, struct token domain, char *message)
                     space_manager_set_layout_for_all_spaces(&g_space_manager, VIEW_STACK);
                 } else if (token_equals(value, ARGUMENT_CONFIG_LAYOUT_FLOAT)) {
                     space_manager_set_layout_for_all_spaces(&g_space_manager, VIEW_FLOAT);
+                } else if (token_equals(value, ARGUMENT_CONFIG_LAYOUT_SCROLL)) {
+                    space_manager_set_layout_for_all_spaces(&g_space_manager, VIEW_SCROLL);
                 } else {
                     daemon_fail(rsp, "unknown value '%.*s' given to command '%.*s' for domain '%.*s'\n", value.length, value.text, command.length, command.text, domain.length, domain.text);
                 }
@@ -1891,64 +1904,68 @@ static void handle_domain_space(FILE *rsp, struct token domain, char *message)
             }
         } else if (token_equals(command, COMMAND_SPACE_EQUALIZE)) {
             struct token value = get_token(&message);
+            struct view *view = space_manager_find_view(&g_space_manager, acting_sid);
             if (!token_is_valid(value)) {
                 if (!space_manager_equalize_space(&g_space_manager, acting_sid, SPLIT_X | SPLIT_Y)) {
-                    daemon_fail(rsp, "cannot equalize a non-managed space.\n");
+                    daemon_fail(rsp, view->layout == VIEW_SCROLL ? "cannot equalize a scroll space.\n" : "cannot equalize a non-managed space.\n");
                 }
             } else if (token_equals(value, ARGUMENT_COMMON_VAL_AXIS_X)) {
                 if (!space_manager_equalize_space(&g_space_manager, acting_sid, SPLIT_X)) {
-                    daemon_fail(rsp, "cannot equalize a non-managed space.\n");
+                    daemon_fail(rsp, view->layout == VIEW_SCROLL ? "cannot equalize a scroll space.\n" : "cannot equalize a non-managed space.\n");
                 }
             } else if (token_equals(value, ARGUMENT_COMMON_VAL_AXIS_Y)) {
                 if (!space_manager_equalize_space(&g_space_manager, acting_sid, SPLIT_Y)) {
-                    daemon_fail(rsp, "cannot equalize a non-managed space.\n");
+                    daemon_fail(rsp, view->layout == VIEW_SCROLL ? "cannot equalize a scroll space.\n" : "cannot equalize a non-managed space.\n");
                 }
             } else {
                 daemon_fail(rsp, "unknown value '%.*s' given to command '%.*s' for domain '%.*s'\n", value.length, value.text, command.length, command.text, domain.length, domain.text);
             }
         } else if (token_equals(command, COMMAND_SPACE_BALANCE)) {
             struct token value = get_token(&message);
+            struct view *view = space_manager_find_view(&g_space_manager, acting_sid);
             if (!token_is_valid(value)) {
                 if (!space_manager_balance_space(&g_space_manager, acting_sid, SPLIT_X | SPLIT_Y)) {
-                    daemon_fail(rsp, "cannot balance a non-managed space.\n");
+                    daemon_fail(rsp, view->layout == VIEW_SCROLL ? "cannot balance a scroll space.\n" : "cannot balance a non-managed space.\n");
                 }
             } else if (token_equals(value, ARGUMENT_COMMON_VAL_AXIS_X)) {
                 if (!space_manager_balance_space(&g_space_manager, acting_sid, SPLIT_X)) {
-                    daemon_fail(rsp, "cannot balance a non-managed space.\n");
+                    daemon_fail(rsp, view->layout == VIEW_SCROLL ? "cannot balance a scroll space.\n" : "cannot balance a non-managed space.\n");
                 }
             } else if (token_equals(value, ARGUMENT_COMMON_VAL_AXIS_Y)) {
                 if (!space_manager_balance_space(&g_space_manager, acting_sid, SPLIT_Y)) {
-                    daemon_fail(rsp, "cannot balance a non-managed space.\n");
+                    daemon_fail(rsp, view->layout == VIEW_SCROLL ? "cannot balance a scroll space.\n" : "cannot balance a non-managed space.\n");
                 }
             } else {
                 daemon_fail(rsp, "unknown value '%.*s' given to command '%.*s' for domain '%.*s'\n", value.length, value.text, command.length, command.text, domain.length, domain.text);
             }
         } else if (token_equals(command, COMMAND_SPACE_MIRROR)) {
             struct token value = get_token(&message);
+            struct view *view = space_manager_find_view(&g_space_manager, acting_sid);
             if (token_equals(value, ARGUMENT_COMMON_VAL_AXIS_X)) {
                 if (!space_manager_mirror_space(&g_space_manager, acting_sid, SPLIT_X)) {
-                    daemon_fail(rsp, "cannot mirror a non-managed space.\n");
+                    daemon_fail(rsp, view->layout == VIEW_SCROLL ? "cannot mirror a scroll space.\n" : "cannot mirror a non-managed space.\n");
                 }
             } else if (token_equals(value, ARGUMENT_COMMON_VAL_AXIS_Y)) {
                 if (!space_manager_mirror_space(&g_space_manager, acting_sid, SPLIT_Y)) {
-                    daemon_fail(rsp, "cannot mirror a non-managed space.\n");
+                    daemon_fail(rsp, view->layout == VIEW_SCROLL ? "cannot mirror a scroll space.\n" : "cannot mirror a non-managed space.\n");
                 }
             } else {
                 daemon_fail(rsp, "unknown value '%.*s' given to command '%.*s' for domain '%.*s'\n", value.length, value.text, command.length, command.text, domain.length, domain.text);
             }
         } else if (token_equals(command, COMMAND_SPACE_ROTATE)) {
             struct token value = get_token(&message);
+            struct view *view = space_manager_find_view(&g_space_manager, acting_sid);
             if (token_equals(value, ARGUMENT_SPACE_ROTATE_90)) {
                 if (!space_manager_rotate_space(&g_space_manager, acting_sid, 90)) {
-                    daemon_fail(rsp, "cannot rotate a non-managed space.\n");
+                    daemon_fail(rsp, view->layout == VIEW_SCROLL ? "cannot rotate a scroll space.\n" : "cannot rotate a non-managed space.\n");
                 }
             } else if (token_equals(value, ARGUMENT_SPACE_ROTATE_180)) {
                 if (!space_manager_rotate_space(&g_space_manager, acting_sid, 180)) {
-                    daemon_fail(rsp, "cannot rotate a non-managed space.\n");
+                    daemon_fail(rsp, view->layout == VIEW_SCROLL ? "cannot rotate a scroll space.\n" : "cannot rotate a non-managed space.\n");
                 }
             } else if (token_equals(value, ARGUMENT_SPACE_ROTATE_270)) {
                 if (!space_manager_rotate_space(&g_space_manager, acting_sid, 270)) {
-                    daemon_fail(rsp, "cannot rotate a non-managed space.\n");
+                    daemon_fail(rsp, view->layout == VIEW_SCROLL ? "cannot rotate a scroll space.\n" : "cannot rotate a non-managed space.\n");
                 }
             } else {
                 daemon_fail(rsp, "unknown value '%.*s' given to command '%.*s' for domain '%.*s'\n", value.length, value.text, command.length, command.text, domain.length, domain.text);
@@ -2009,6 +2026,12 @@ static void handle_domain_space(FILE *rsp, struct token domain, char *message)
             } else if (token_equals(value, ARGUMENT_SPACE_LAYOUT_FLT)) {
                 if (space_is_user(acting_sid)) {
                     space_manager_set_layout_for_space(&g_space_manager, acting_sid, VIEW_FLOAT);
+                } else {
+                    daemon_fail(rsp, "cannot set layout for a macOS fullscreen space!\n");
+                }
+            } else if (token_equals(value, ARGUMENT_SPACE_LAYOUT_SCROLL)) {
+                if (space_is_user(acting_sid)) {
+                    space_manager_set_layout_for_space(&g_space_manager, acting_sid, VIEW_SCROLL);
                 } else {
                     daemon_fail(rsp, "cannot set layout for a macOS fullscreen space!\n");
                 }
@@ -2184,7 +2207,9 @@ static void handle_domain_window(FILE *rsp, struct token domain, char *message)
             struct selector selector = parse_window_selector(rsp, &message, acting_window, false);
             if (selector.did_parse && selector.window) {
                 enum window_op_error result = window_manager_stack_window(&g_space_manager, &g_window_manager, acting_window, selector.window);
-                if (result == WINDOW_OP_ERROR_INVALID_SRC_NODE) {
+                if (result == WINDOW_OP_ERROR_INVALID_SRC_VIEW) {
+                    daemon_fail(rsp, "window stacking is not supported for scroll spaces.\n");
+                } else if (result == WINDOW_OP_ERROR_INVALID_SRC_NODE) {
                     daemon_fail(rsp, "the acting window is not managed.\n");
                 } else if (result == WINDOW_OP_ERROR_MAX_STACK) {
                     daemon_fail(rsp, "cannot stack window, max capacity of %d reached.\n", NODE_MAX_WINDOW_COUNT);
@@ -2197,7 +2222,8 @@ static void handle_domain_window(FILE *rsp, struct token domain, char *message)
             if (selector.did_parse && selector.dir) {
                 enum window_op_error result = window_manager_set_window_insertion(&g_space_manager, acting_window, selector.dir);
                 if (result == WINDOW_OP_ERROR_INVALID_SRC_VIEW) {
-                    daemon_fail(rsp, "the acting window is not within a bsp space.\n");
+                    struct view *view = acting_window ? window_manager_find_managed_window(&g_window_manager, acting_window) : NULL;
+                    daemon_fail(rsp, view && view->layout == VIEW_SCROLL ? "window insertion is not supported for scroll spaces.\n" : "the acting window is not within a bsp space.\n");
                 } else if (result == WINDOW_OP_ERROR_INVALID_SRC_NODE) {
                     daemon_fail(rsp, "the acting window is not managed.\n");
                 }
@@ -2236,7 +2262,8 @@ static void handle_domain_window(FILE *rsp, struct token domain, char *message)
                 } else if (result == WINDOW_OP_ERROR_INVALID_DST_NODE) {
                     daemon_fail(rsp, "cannot locate a bsp node fence.\n");
                 } else if (result == WINDOW_OP_ERROR_INVALID_OPERATION) {
-                    daemon_fail(rsp, "cannot use absolute resizing on a managed window.\n");
+                    struct view *view = acting_window ? window_manager_find_managed_window(&g_window_manager, acting_window) : NULL;
+                    daemon_fail(rsp, view && view->layout == VIEW_SCROLL ? "scroll spaces only support left/right resizing.\n" : "cannot use absolute resizing on a managed window.\n");
                 }
             } else {
                 daemon_fail(rsp, "unknown value '%.*s' given to command '%.*s' for domain '%.*s'\n", value.length, value.text, command.length, command.text, domain.length, domain.text);
@@ -2251,6 +2278,8 @@ static void handle_domain_window(FILE *rsp, struct token domain, char *message)
                     daemon_fail(rsp, "cannot adjust ratio of a non-managed window.\n");
                 } else if (result == WINDOW_OP_ERROR_INVALID_SRC_NODE) {
                     daemon_fail(rsp, "cannot adjust ratio of a root node.\n");
+                } else if (result == WINDOW_OP_ERROR_INVALID_OPERATION) {
+                    daemon_fail(rsp, "window ratio adjustment is not supported for scroll spaces.\n");
                 }
             } else {
                 daemon_fail(rsp, "unknown value '%.*s' given to command '%.*s' for domain '%.*s'\n", value.length, value.text, command.length, command.text, domain.length, domain.text);
@@ -2277,7 +2306,12 @@ static void handle_domain_window(FILE *rsp, struct token domain, char *message)
                 }
             } else if (token_equals(value, ARGUMENT_WINDOW_TOGGLE_SPLIT)) {
                 if (acting_window) {
-                    space_manager_toggle_window_split(&g_space_manager, acting_window);
+                    struct view *view = window_manager_find_managed_window(&g_window_manager, acting_window);
+                    if (view && view->layout == VIEW_SCROLL) {
+                        daemon_fail(rsp, "window split toggling is not supported for scroll spaces.\n");
+                    } else {
+                        space_manager_toggle_window_split(&g_space_manager, acting_window);
+                    }
                 } else {
                     daemon_fail(rsp, "could not locate the window to act on!\n");
                 }

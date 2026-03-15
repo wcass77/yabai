@@ -171,7 +171,8 @@ enum view_type
     VIEW_DEFAULT,
     VIEW_BSP,
     VIEW_STACK,
-    VIEW_FLOAT
+    VIEW_FLOAT,
+    VIEW_SCROLL
 };
 
 static const char *view_type_str[] =
@@ -179,7 +180,28 @@ static const char *view_type_str[] =
     "default",
     "bsp",
     "stack",
-    "float"
+    "float",
+    "scroll"
+};
+
+#define VIEW_SCROLL_EDGE_PEEK 8
+
+struct scroll_column
+{
+    uint32_t window_id;
+    float x;
+    float y;
+    float w;
+    float h;
+    float width;
+};
+
+struct scroll_view
+{
+    struct scroll_column *column_list;
+    struct area area;
+    float viewport_x;
+    int focused_index;
 };
 
 enum view_flag
@@ -203,6 +225,7 @@ struct view
     CFStringRef uuid;
     uint64_t sid;
     struct window_node *root;
+    struct scroll_view scroll;
     uint32_t insertion_point;
     enum view_type layout;
     enum window_node_split split_type;
@@ -240,6 +263,16 @@ struct window_node *view_add_window_node_with_insertion_point(struct view *view,
 struct window_node *view_add_window_node(struct view *view, struct window *window);
 struct window_node *view_remove_window_node(struct view *view, struct window *window);
 uint32_t *view_find_window_list(struct view *view, int *window_count);
+int view_find_window_index(struct view *view, uint32_t window_id);
+uint32_t view_find_prev_window_id(struct view *view, uint32_t window_id);
+uint32_t view_find_next_window_id(struct view *view, uint32_t window_id);
+uint32_t view_find_first_window_id(struct view *view);
+uint32_t view_find_last_window_id(struct view *view);
+bool view_swap_window_order(struct view *view, uint32_t a_id, uint32_t b_id);
+bool view_warp_window_order(struct view *view, uint32_t a_id, uint32_t b_id);
+bool view_resize_window(struct view *view, uint32_t window_id, int direction, float dx, float dy);
+bool view_set_focused_window(struct view *view, uint32_t window_id);
+bool view_scroll_step(struct view *view, int direction);
 
 void view_serialize(FILE *rsp, struct view *view, uint64_t flags);
 bool view_is_invalid(struct view *view);

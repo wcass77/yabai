@@ -31,6 +31,7 @@ struct window_manager g_window_manager;
 struct space_manager g_space_manager;
 struct memory_pool g_signal_storage;
 struct mouse_state g_mouse_state;
+struct gesture_handler g_gesture_handler;
 struct event_loop g_event_loop;
 void *g_workspace_context;
 
@@ -306,6 +307,8 @@ int main(int argc, char **argv)
     if (!mouse_handler_begin(&g_mouse_state, MOUSE_EVENT_MASK)) {
         error("yabai: could not start mouse handler! abort..\n");
     }
+
+    gesture_handler_begin(&g_gesture_handler);
 
     if (workspace_is_macos_monterey() ||
         workspace_is_macos_ventura() ||

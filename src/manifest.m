@@ -75,11 +75,13 @@
 #include "space_manager.h"
 #include "window_manager.h"
 #include "mouse_handler.h"
+#include "gesture_handler.h"
 
 #include "sa.m"
 #include "mission_control.c"
 #include "event_loop.c"
 #include "event_signal.c"
+#include "gesture_handler.m"
 #include "workspace.m"
 #include "rule.c"
 #include "message.c"
