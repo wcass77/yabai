@@ -1909,10 +1909,15 @@ enum window_op_error window_manager_warp_window(struct space_manager *sm, struct
 
     uint64_t b_sid = window_space(b->id);
     struct view *b_view = space_manager_find_view(sm, b_sid);
+    if (!a_view) return WINDOW_OP_ERROR_INVALID_SRC_VIEW;
+    if (!b_view) return WINDOW_OP_ERROR_INVALID_DST_VIEW;
+
     if (a_view->layout == VIEW_SCROLL || b_view->layout == VIEW_SCROLL) {
         if (a_view->layout != VIEW_SCROLL) return WINDOW_OP_ERROR_INVALID_SRC_VIEW;
         if (b_view->layout != VIEW_SCROLL) return WINDOW_OP_ERROR_INVALID_DST_VIEW;
         if (a_view != b_view) return WINDOW_OP_ERROR_INVALID_DST_VIEW;
+        if (view_find_window_index(a_view, a->id) == -1) return WINDOW_OP_ERROR_INVALID_SRC_NODE;
+        if (view_find_window_index(b_view, b->id) == -1) return WINDOW_OP_ERROR_INVALID_DST_NODE;
 
         if (!view_warp_window_order(a_view, a->id, b->id)) return WINDOW_OP_ERROR_INVALID_DST_NODE;
         view_flush(a_view);
@@ -1943,7 +1948,7 @@ enum window_op_error window_manager_warp_window(struct space_manager *sm, struct
             struct window_node *a_node_add = view_add_window_node_with_insertion_point(b_view, a, b->id);
 
             struct window_capture *window_list = NULL;
-            window_node_capture_windows(a_node_add, &window_list);
+            if (a_node_add) window_node_capture_windows(a_node_add, &window_list);
             window_manager_animate_window_list(window_list, ts_buf_len(window_list));
         } else {
             if (window_node_contains_window(a_node, a_view->insertion_point)) {
@@ -1992,7 +1997,7 @@ enum window_op_error window_manager_warp_window(struct space_manager *sm, struct
                 window_node_capture_windows(a_node_rm, &window_list);
             }
 
-            if (a_node_rm != a_node_add && a_node_rm != a_node_add->parent) {
+            if (a_node_add && a_node_rm != a_node_add && a_node_rm != a_node_add->parent) {
                 window_node_capture_windows(a_node_add, &window_list);
             }
 
@@ -2037,11 +2042,15 @@ enum window_op_error window_manager_swap_window(struct space_manager *sm, struct
 
     uint64_t b_sid = window_space(b->id);
     struct view *b_view = space_manager_find_view(sm, b_sid);
+    if (!a_view) return WINDOW_OP_ERROR_INVALID_SRC_VIEW;
+    if (!b_view) return WINDOW_OP_ERROR_INVALID_DST_VIEW;
 
     if (a_view->layout == VIEW_SCROLL || b_view->layout == VIEW_SCROLL) {
         if (a_view->layout != VIEW_SCROLL) return WINDOW_OP_ERROR_INVALID_SRC_VIEW;
         if (b_view->layout != VIEW_SCROLL) return WINDOW_OP_ERROR_INVALID_DST_VIEW;
         if (a_view != b_view) return WINDOW_OP_ERROR_INVALID_DST_VIEW;
+        if (view_find_window_index(a_view, a->id) == -1) return WINDOW_OP_ERROR_INVALID_SRC_NODE;
+        if (view_find_window_index(b_view, b->id) == -1) return WINDOW_OP_ERROR_INVALID_DST_NODE;
         if (!view_swap_window_order(a_view, a->id, b->id)) return WINDOW_OP_ERROR_INVALID_DST_NODE;
 
         if (a->id == wm->focused_window_id) {
@@ -2050,7 +2059,9 @@ enum window_op_error window_manager_swap_window(struct space_manager *sm, struct
             window_manager_focus_window_with_raise(&a->application->psn, a->id, a->ref);
         }
 
-        view_flush(a_view);
+        if (a->id != wm->focused_window_id && b->id != wm->focused_window_id) {
+            view_flush(a_view);
+        }
         return WINDOW_OP_ERROR_SUCCESS;
     }
 

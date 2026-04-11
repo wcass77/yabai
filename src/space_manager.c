@@ -105,6 +105,7 @@ struct view *space_manager_find_view(struct space_manager *sm, uint64_t sid)
     struct view *view = table_find(&sm->view, &sid);
     if (!view) {
         view = view_create(sid);
+        if (!view) return NULL;
         table_add(&sm->view, &sid, view);
     }
     return view;

@@ -185,6 +185,30 @@ TEST_FUNC(scroll_warp_moves_in_both_directions,
     buf_free(view.scroll.column_list);
 });
 
+TEST_FUNC(scroll_warp_preserves_unmoved_focus,
+{
+    struct view view = {0};
+    view.layout = VIEW_SCROLL;
+    view.scroll.area.w = 300;
+    view.scroll.area.h = 100;
+    view.scroll.focused_index = 2;
+
+    buf_push(view.scroll.column_list, ((struct scroll_column) { .window_id = 11, .w = 100, .h = 100 }));
+    buf_push(view.scroll.column_list, ((struct scroll_column) { .window_id = 22, .w = 100, .h = 100 }));
+    buf_push(view.scroll.column_list, ((struct scroll_column) { .window_id = 33, .w = 100, .h = 100 }));
+    buf_push(view.scroll.column_list, ((struct scroll_column) { .window_id = 44, .w = 100, .h = 100 }));
+
+    TEST_CHECK(view_warp_window_order(&view, 11, 44), true);
+    TEST_CHECK(view.scroll.column_list[1].window_id, 33);
+    TEST_CHECK(view.scroll.focused_index, 1);
+
+    TEST_CHECK(view_warp_window_order(&view, 44, 33), true);
+    TEST_CHECK(view.scroll.column_list[2].window_id, 33);
+    TEST_CHECK(view.scroll.focused_index, 2);
+
+    buf_free(view.scroll.column_list);
+});
+
 TEST_FUNC(display_local_user_space_navigation,
 {
     uint64_t user_space_list[3];

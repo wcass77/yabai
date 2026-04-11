@@ -1139,6 +1139,8 @@ bool view_warp_window_order(struct view *view, uint32_t a_id, uint32_t b_id)
     int b_index = scroll_view_find_column_index(view, b_id);
     if (a_index == -1 || b_index == -1 || a_index == b_index) return false;
 
+    int old_focus = view->scroll.focused_index;
+    bool moving_focused_column = a_index == old_focus;
     bool move_after_target = a_index < b_index;
     struct scroll_column column = view->scroll.column_list[a_index];
     if (a_index < scroll_column_count(view) - 1) {
@@ -1147,6 +1149,7 @@ bool view_warp_window_order(struct view *view, uint32_t a_id, uint32_t b_id)
                 sizeof(struct scroll_column) * (scroll_column_count(view) - a_index - 1));
     }
     buf__hdr(view->scroll.column_list)->len--;
+    if (a_index < old_focus) --old_focus;
 
     if (a_index < b_index) --b_index;
     int insert_index = move_after_target ? b_index + 1 : b_index;
@@ -1160,7 +1163,13 @@ bool view_warp_window_order(struct view *view, uint32_t a_id, uint32_t b_id)
     view->scroll.column_list[insert_index] = column;
     buf__hdr(view->scroll.column_list)->len++;
 
-    view->scroll.focused_index = insert_index;
+    if (moving_focused_column) {
+        view->scroll.focused_index = insert_index;
+    } else {
+        if (insert_index <= old_focus) ++old_focus;
+        view->scroll.focused_index = old_focus;
+    }
+
     scroll_view_update(view);
     return true;
 }
@@ -1375,9 +1384,16 @@ void view_update(struct view *view)
 struct view *view_create(uint64_t sid)
 {
     struct view *view = malloc(sizeof(struct view));
+    if (!view) return NULL;
+
     memset(view, 0, sizeof(struct view));
 
     view->root = malloc(sizeof(struct window_node));
+    if (!view->root) {
+        free(view);
+        return NULL;
+    }
+
     memset(view->root, 0, sizeof(struct window_node));
 
     view->sid = sid;
