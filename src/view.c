@@ -1126,6 +1126,7 @@ bool view_warp_window_order(struct view *view, uint32_t a_id, uint32_t b_id)
     int b_index = scroll_view_find_column_index(view, b_id);
     if (a_index == -1 || b_index == -1 || a_index == b_index) return false;
 
+    bool move_after_target = a_index < b_index;
     struct scroll_column column = view->scroll.column_list[a_index];
     if (a_index < scroll_column_count(view) - 1) {
         memmove(view->scroll.column_list + a_index,
@@ -1135,17 +1136,18 @@ bool view_warp_window_order(struct view *view, uint32_t a_id, uint32_t b_id)
     buf__hdr(view->scroll.column_list)->len--;
 
     if (a_index < b_index) --b_index;
+    int insert_index = move_after_target ? b_index + 1 : b_index;
 
     buf__fit(view->scroll.column_list, 1);
-    if (b_index < scroll_column_count(view)) {
-        memmove(view->scroll.column_list + b_index + 1,
-                view->scroll.column_list + b_index,
-                sizeof(struct scroll_column) * (scroll_column_count(view) - b_index));
+    if (insert_index < scroll_column_count(view)) {
+        memmove(view->scroll.column_list + insert_index + 1,
+                view->scroll.column_list + insert_index,
+                sizeof(struct scroll_column) * (scroll_column_count(view) - insert_index));
     }
-    view->scroll.column_list[b_index] = column;
+    view->scroll.column_list[insert_index] = column;
     buf__hdr(view->scroll.column_list)->len++;
 
-    view->scroll.focused_index = b_index;
+    view->scroll.focused_index = insert_index;
     scroll_view_update(view);
     return true;
 }
@@ -1173,7 +1175,14 @@ bool view_set_focused_window(struct view *view, uint32_t window_id)
     int index = scroll_view_find_column_index(view, window_id);
     if (index == -1) return false;
 
+    int previous_index = view->scroll.focused_index;
+    float previous_viewport_x = view->scroll.viewport_x;
     scroll_view_center_on_index(view, index);
+    if (previous_index == view->scroll.focused_index &&
+        previous_viewport_x == view->scroll.viewport_x) {
+        return false;
+    }
+
     view_set_flag(view, VIEW_IS_DIRTY);
     return true;
 }

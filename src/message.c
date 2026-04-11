@@ -111,6 +111,7 @@ extern bool g_verbose;
 #define COMMAND_SPACE_GAP      "--gap"
 #define COMMAND_SPACE_TOGGLE   "--toggle"
 #define COMMAND_SPACE_LAYOUT   "--layout"
+#define COMMAND_SPACE_SCROLL   "--scroll"
 #define COMMAND_SPACE_LABEL    "--label"
 
 #define ARGUMENT_SPACE_ROTATE_90    "90"
@@ -1757,6 +1758,18 @@ static void handle_domain_display(FILE *rsp, struct token domain, char *message)
     }
 }
 
+static void focus_visible_scroll_column(struct view *view)
+{
+    if (!space_is_visible(view->sid)) return;
+    if (!in_range_ie(view->scroll.focused_index, 0, buf_len(view->scroll.column_list))) return;
+
+    uint32_t window_id = view->scroll.column_list[view->scroll.focused_index].window_id;
+    struct window *window = window_manager_find_window(&g_window_manager, window_id);
+    if (window) {
+        window_manager_focus_window_with_raise(&window->application->psn, window->id, window->ref);
+    }
+}
+
 static void handle_domain_space(FILE *rsp, struct token domain, char *message)
 {
     TIME_FUNCTION;
@@ -2034,6 +2047,36 @@ static void handle_domain_space(FILE *rsp, struct token domain, char *message)
                     space_manager_set_layout_for_space(&g_space_manager, acting_sid, VIEW_SCROLL);
                 } else {
                     daemon_fail(rsp, "cannot set layout for a macOS fullscreen space!\n");
+                }
+            } else {
+                daemon_fail(rsp, "unknown value '%.*s' given to command '%.*s' for domain '%.*s'\n", value.length, value.text, command.length, command.text, domain.length, domain.text);
+            }
+        } else if (token_equals(command, COMMAND_SPACE_SCROLL)) {
+            struct token value = get_token(&message);
+            struct view *view = space_manager_find_view(&g_space_manager, acting_sid);
+            if (!view || view->layout != VIEW_SCROLL) {
+                daemon_fail(rsp, "cannot scroll a non-scroll space.\n");
+            } else if (token_equals(value, ARGUMENT_COMMON_SEL_PREV) || token_equals(value, ARGUMENT_COMMON_SEL_WEST)) {
+                if (view_scroll_step(view, DIR_WEST)) {
+                    view_flush(view);
+                    focus_visible_scroll_column(view);
+                }
+            } else if (token_equals(value, ARGUMENT_COMMON_SEL_NEXT) || token_equals(value, ARGUMENT_COMMON_SEL_EAST)) {
+                if (view_scroll_step(view, DIR_EAST)) {
+                    view_flush(view);
+                    focus_visible_scroll_column(view);
+                }
+            } else if (token_equals(value, ARGUMENT_COMMON_SEL_FIRST)) {
+                uint32_t window_id = view_find_first_window_id(view);
+                if (window_id && view_set_focused_window(view, window_id)) {
+                    view_flush(view);
+                    focus_visible_scroll_column(view);
+                }
+            } else if (token_equals(value, ARGUMENT_COMMON_SEL_LAST)) {
+                uint32_t window_id = view_find_last_window_id(view);
+                if (window_id && view_set_focused_window(view, window_id)) {
+                    view_flush(view);
+                    focus_visible_scroll_column(view);
                 }
             } else {
                 daemon_fail(rsp, "unknown value '%.*s' given to command '%.*s' for domain '%.*s'\n", value.length, value.text, command.length, command.text, domain.length, domain.text);

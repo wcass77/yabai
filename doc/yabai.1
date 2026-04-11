@@ -518,6 +518,13 @@ Toggle space setting on or off for the selected space.
 Set the layout of the selected space.
 .RE
 .sp
+\fB\-\-scroll\fP \fIprev|next|first|last|west|east\fP
+.RS 4
+Scroll the selected \fBscroll\fP space by one column or jump to the first/last column, focusing the target column when the space is visible.
+.br
+Boundary scrolls are no\-ops. Use this command from keybindings for scroll workspace navigation.
+.RE
+.sp
 \fB\-\-label\fP [\fI<LABEL>\fP]
 .RS 4
 Label the selected space, allowing that label to be used as an alias in commands that take a \f(CRSPACE_SEL\fP parameter.
@@ -637,16 +644,6 @@ Toggle the given property of the selected window.
 The following properties require System Integrity Protection to be partially disabled: sticky, pip, shadow, LABEL (scratchpad identifier) .
 The \fBsplit\fP toggle is not supported on \fBscroll\fP spaces.
 .RE
-.SS "Trackpad Gestures"
-.sp
-When the selected space uses the \fBscroll\fP layout, yabai can react to private trackpad multitouch callbacks:
-.sp
-\(bu three\-finger horizontal swipe scrolls the current workspace by one column
-.br
-\(bu four\-finger horizontal swipe switches to the previous/next user space on the active display
-.sp
-These gestures rely on private macOS APIs and do not suppress Dock\(cqs native gesture handling. Disable conflicting macOS trackpad gestures for switching spaces if you want reliable four\-finger workspace switching.
-.sp
 \fB\-\-sub\-layer\fP \fI<LAYER>\fP
 .RS 4
 Set the stacking sub\-layer of the selected window.

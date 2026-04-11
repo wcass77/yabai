@@ -351,6 +351,10 @@ COMMAND
 *--layout* 'bsp|stack|float|scroll'::
     Set the layout of the selected space.
 
+*--scroll* 'prev|next|first|last|west|east'::
+    Scroll the selected *scroll* space by one column or jump to the first/last column, focusing the target column when the space is visible. +
+    Boundary scrolls are no-ops. Use this command from keybindings for scroll workspace navigation.
+
 *--label* ['<LABEL>']::
     Label the selected space, allowing that label to be used as an alias in commands that take a `SPACE_SEL` parameter. +
     If the command is called without an argument it will try to remove a previously assigned label.
@@ -430,16 +434,6 @@ COMMAND
     Toggle the given property of the selected window. +
     The following properties require System Integrity Protection to be partially disabled: sticky, pip, shadow, LABEL (scratchpad identifier) . +
     The *split* toggle is not supported on *scroll* spaces.
-
-Trackpad Gestures
-~~~~~~~~~~~~~~~~~
-
-When the selected space uses the *scroll* layout, yabai can react to private trackpad multitouch callbacks:
-
-- three-finger horizontal swipe scrolls the current workspace by one column
-- four-finger horizontal swipe switches to the previous/next user space on the active display
-
-These gestures rely on private macOS APIs and do not suppress Dock's native gesture handling. Disable conflicting macOS trackpad gestures for switching spaces if you want reliable four-finger workspace switching.
 
 *--sub-layer* '<LAYER>'::
     Set the stacking sub-layer of the selected window. +

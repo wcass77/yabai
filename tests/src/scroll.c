@@ -58,6 +58,56 @@ TEST_FUNC(scroll_focus_index_after_removal,
     TEST_CHECK(scroll_view_focus_index_after_removal(1, 0), -1);
 });
 
+TEST_FUNC(scroll_focus_state_is_idempotent,
+{
+    struct view view = {0};
+    view.layout = VIEW_SCROLL;
+    view.scroll.area.w = 300;
+    view.scroll.area.h = 100;
+    view.scroll.focused_index = 0;
+
+    buf_push(view.scroll.column_list, ((struct scroll_column) { .window_id = 11, .x = 0,   .w = 120, .h = 100 }));
+    buf_push(view.scroll.column_list, ((struct scroll_column) { .window_id = 22, .x = 130, .w = 120, .h = 100 }));
+    buf_push(view.scroll.column_list, ((struct scroll_column) { .window_id = 33, .x = 260, .w = 120, .h = 100 }));
+
+    TEST_CHECK(view_set_focused_window(&view, 22), true);
+    TEST_CHECK(view.scroll.focused_index, 1);
+    TEST_CHECK((int) view.scroll.viewport_x, 40);
+
+    view_clear_flag(&view, VIEW_IS_DIRTY);
+    TEST_CHECK(view_set_focused_window(&view, 22), false);
+    TEST_CHECK(view_is_dirty(&view), false);
+
+    buf_free(view.scroll.column_list);
+});
+
+TEST_FUNC(scroll_warp_moves_in_both_directions,
+{
+    struct view view = {0};
+    view.layout = VIEW_SCROLL;
+    view.scroll.area.w = 300;
+    view.scroll.area.h = 100;
+    view.scroll.focused_index = 1;
+
+    buf_push(view.scroll.column_list, ((struct scroll_column) { .window_id = 11, .w = 100, .h = 100 }));
+    buf_push(view.scroll.column_list, ((struct scroll_column) { .window_id = 22, .w = 100, .h = 100 }));
+    buf_push(view.scroll.column_list, ((struct scroll_column) { .window_id = 33, .w = 100, .h = 100 }));
+
+    TEST_CHECK(view_warp_window_order(&view, 22, 33), true);
+    TEST_CHECK(view.scroll.column_list[0].window_id, 11);
+    TEST_CHECK(view.scroll.column_list[1].window_id, 33);
+    TEST_CHECK(view.scroll.column_list[2].window_id, 22);
+    TEST_CHECK(view.scroll.focused_index, 2);
+
+    TEST_CHECK(view_warp_window_order(&view, 22, 33), true);
+    TEST_CHECK(view.scroll.column_list[0].window_id, 11);
+    TEST_CHECK(view.scroll.column_list[1].window_id, 22);
+    TEST_CHECK(view.scroll.column_list[2].window_id, 33);
+    TEST_CHECK(view.scroll.focused_index, 1);
+
+    buf_free(view.scroll.column_list);
+});
+
 TEST_FUNC(display_local_user_space_navigation,
 {
     uint64_t user_space_list[3];

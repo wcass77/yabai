@@ -718,9 +718,11 @@ void window_manager_animate_window_list(struct window_capture *window_list, int 
     if (g_window_manager.window_animation_duration) {
         window_manager_animate_window_list_async(window_list, window_count);
     } else {
+        if (window_count > 1) SLSDisableUpdate(g_connection);
         for (int i = 0; i < window_count; ++i) {
             window_manager_set_window_frame(window_list[i].window, window_list[i].x, window_list[i].y, window_list[i].w, window_list[i].h);
         }
+        if (window_count > 1) SLSReenableUpdate(g_connection);
     }
 }
 
@@ -1314,6 +1316,13 @@ void window_manager_focus_window_without_raise(ProcessSerialNumber *window_psn, 
 {
     TIME_FUNCTION;
 
+    struct window *window = window_manager_find_window(&g_window_manager, window_id);
+    struct view *view = window ? window_manager_find_managed_window(&g_window_manager, window) : NULL;
+    if (view && view->layout == VIEW_SCROLL && space_is_visible(view->sid) &&
+        (view_set_focused_window(view, window_id) || view_is_dirty(view))) {
+        view_flush(view);
+    }
+
     if (psn_equals(window_psn, &g_window_manager.focused_window_psn)) {
         memset(g_event_bytes, 0, 0xf8);
         g_event_bytes[0x04] = 0xf8;
@@ -1344,6 +1353,13 @@ void window_manager_focus_window_without_raise(ProcessSerialNumber *window_psn, 
 void window_manager_focus_window_with_raise(ProcessSerialNumber *window_psn, uint32_t window_id, AXUIElementRef window_ref)
 {
     TIME_FUNCTION;
+
+    struct window *window = window_manager_find_window(&g_window_manager, window_id);
+    struct view *view = window ? window_manager_find_managed_window(&g_window_manager, window) : NULL;
+    if (view && view->layout == VIEW_SCROLL && space_is_visible(view->sid) &&
+        (view_set_focused_window(view, window_id) || view_is_dirty(view))) {
+        view_flush(view);
+    }
 
 #if 1
     _SLPSSetFrontProcessWithOptions(window_psn, window_id, kCPSUserGenerated);

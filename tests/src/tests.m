@@ -21,6 +21,8 @@ typedef TEST_SIG(function);
     TEST_ENTRY(scroll_window_order_navigation)                 \
     TEST_ENTRY(scroll_viewport_centering_and_edge_peek)        \
     TEST_ENTRY(scroll_focus_index_after_removal)               \
+    TEST_ENTRY(scroll_focus_state_is_idempotent)               \
+    TEST_ENTRY(scroll_warp_moves_in_both_directions)           \
     TEST_ENTRY(display_local_user_space_navigation)
 
 static struct {
