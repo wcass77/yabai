@@ -923,16 +923,27 @@ struct window_node *view_add_window_node_with_insertion_point(struct view *view,
             insert_index = view->scroll.focused_index + 1;
         }
 
+        int column_count = scroll_column_count(view);
+        int focused_index = view->scroll.focused_index;
+        bool focus_inserted_window = window->id == g_window_manager.focused_window_id ||
+                                     (!insertion_point && g_space_manager.window_insertion_point == INSERT_FOCUSED);
+
         buf__fit(view->scroll.column_list, 1);
-        if (insert_index < scroll_column_count(view)) {
+        if (insert_index < column_count) {
             memmove(view->scroll.column_list + insert_index + 1,
                     view->scroll.column_list + insert_index,
-                    sizeof(struct scroll_column) * (scroll_column_count(view) - insert_index));
+                    sizeof(struct scroll_column) * (column_count - insert_index));
         }
 
         view->scroll.column_list[insert_index] = column;
         buf__hdr(view->scroll.column_list)->len++;
-        view->scroll.focused_index = insert_index;
+
+        if (focus_inserted_window) {
+            view->scroll.focused_index = insert_index;
+        } else if (in_range_ie(focused_index, 0, column_count) && insert_index <= focused_index) {
+            view->scroll.focused_index = focused_index + 1;
+        }
+
         scroll_view_update(view);
         view->insertion_point = window->id;
         return NULL;

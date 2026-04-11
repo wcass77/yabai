@@ -116,7 +116,7 @@ enum mouse_drop_action mouse_determine_drop_action(struct mouse_state *ms, struc
 void mouse_drop_action_stack(struct window_manager *wm, struct view *src_view, struct window *src_window, struct view *dst_view, struct window *dst_window)
 {
     struct window_node *dst_node = view_find_window_node(dst_view, dst_window->id);
-    if (!dst_node || dst_node->window_count+1 >= NODE_MAX_WINDOW_COUNT) return;
+    if (!dst_node || dst_node->window_count >= NODE_MAX_WINDOW_COUNT) return;
 
     space_manager_untile_window(src_view, src_window);
     window_manager_remove_managed_window(wm, src_window->id);

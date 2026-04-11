@@ -99,6 +99,65 @@ TEST_FUNC(scroll_step_rejects_unsupported_directions,
     buf_free(view.scroll.column_list);
 });
 
+TEST_FUNC(scroll_background_insert_preserves_focus,
+{
+    enum window_insertion_point old_insertion_point = g_space_manager.window_insertion_point;
+    uint32_t old_focused_window_id = g_window_manager.focused_window_id;
+
+    g_space_manager.window_insertion_point = INSERT_FIRST;
+    g_window_manager.focused_window_id = 22;
+
+    struct view view = {0};
+    view.layout = VIEW_SCROLL;
+    view.scroll.area.w = 300;
+    view.scroll.area.h = 100;
+    view.scroll.focused_index = 1;
+
+    struct window window = { .id = 33 };
+
+    buf_push(view.scroll.column_list, ((struct scroll_column) { .window_id = 11, .w = 100, .h = 100 }));
+    buf_push(view.scroll.column_list, ((struct scroll_column) { .window_id = 22, .w = 100, .h = 100 }));
+
+    view_add_window_node_with_insertion_point(&view, &window, 0);
+
+    TEST_CHECK(view.scroll.column_list[0].window_id, 33);
+    TEST_CHECK(view.scroll.column_list[2].window_id, 22);
+    TEST_CHECK(view.scroll.focused_index, 2);
+
+    buf_free(view.scroll.column_list);
+    g_space_manager.window_insertion_point = old_insertion_point;
+    g_window_manager.focused_window_id = old_focused_window_id;
+});
+
+TEST_FUNC(scroll_focused_insert_updates_focus,
+{
+    enum window_insertion_point old_insertion_point = g_space_manager.window_insertion_point;
+    uint32_t old_focused_window_id = g_window_manager.focused_window_id;
+
+    g_space_manager.window_insertion_point = INSERT_LAST;
+    g_window_manager.focused_window_id = 33;
+
+    struct view view = {0};
+    view.layout = VIEW_SCROLL;
+    view.scroll.area.w = 300;
+    view.scroll.area.h = 100;
+    view.scroll.focused_index = 0;
+
+    struct window window = { .id = 33 };
+
+    buf_push(view.scroll.column_list, ((struct scroll_column) { .window_id = 11, .w = 100, .h = 100 }));
+    buf_push(view.scroll.column_list, ((struct scroll_column) { .window_id = 22, .w = 100, .h = 100 }));
+
+    view_add_window_node_with_insertion_point(&view, &window, 0);
+
+    TEST_CHECK(view.scroll.column_list[2].window_id, 33);
+    TEST_CHECK(view.scroll.focused_index, 2);
+
+    buf_free(view.scroll.column_list);
+    g_space_manager.window_insertion_point = old_insertion_point;
+    g_window_manager.focused_window_id = old_focused_window_id;
+});
+
 TEST_FUNC(scroll_warp_moves_in_both_directions,
 {
     struct view view = {0};

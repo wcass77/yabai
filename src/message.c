@@ -2068,13 +2068,15 @@ static void handle_domain_space(FILE *rsp, struct token domain, char *message)
                 }
             } else if (token_equals(value, ARGUMENT_COMMON_SEL_FIRST)) {
                 uint32_t window_id = view_find_first_window_id(view);
-                if (window_id && view_set_focused_window(view, window_id)) {
+                if (window_id) {
+                    view_set_focused_window(view, window_id);
                     view_flush(view);
                     focus_visible_scroll_column(view);
                 }
             } else if (token_equals(value, ARGUMENT_COMMON_SEL_LAST)) {
                 uint32_t window_id = view_find_last_window_id(view);
-                if (window_id && view_set_focused_window(view, window_id)) {
+                if (window_id) {
+                    view_set_focused_window(view, window_id);
                     view_flush(view);
                     focus_visible_scroll_column(view);
                 }

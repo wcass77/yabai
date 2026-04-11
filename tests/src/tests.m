@@ -23,6 +23,8 @@ typedef TEST_SIG(function);
     TEST_ENTRY(scroll_focus_index_after_removal)               \
     TEST_ENTRY(scroll_focus_state_is_idempotent)               \
     TEST_ENTRY(scroll_step_rejects_unsupported_directions)     \
+    TEST_ENTRY(scroll_background_insert_preserves_focus)        \
+    TEST_ENTRY(scroll_focused_insert_updates_focus)             \
     TEST_ENTRY(scroll_warp_moves_in_both_directions)           \
     TEST_ENTRY(display_local_user_space_navigation)
 
