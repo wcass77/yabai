@@ -2251,7 +2251,8 @@ static void handle_domain_window(FILE *rsp, struct token domain, char *message)
             if (selector.did_parse && selector.window) {
                 enum window_op_error result = window_manager_stack_window(&g_space_manager, &g_window_manager, acting_window, selector.window);
                 if (result == WINDOW_OP_ERROR_INVALID_SRC_VIEW) {
-                    daemon_fail(rsp, "window stacking is not supported for scroll spaces.\n");
+                    struct view *view = acting_window ? window_manager_find_managed_window(&g_window_manager, acting_window) : NULL;
+                    daemon_fail(rsp, view && view->layout == VIEW_SCROLL ? "window stacking is not supported for scroll spaces.\n" : "the acting window is not within a bsp space.\n");
                 } else if (result == WINDOW_OP_ERROR_INVALID_SRC_NODE) {
                     daemon_fail(rsp, "the acting window is not managed.\n");
                 } else if (result == WINDOW_OP_ERROR_MAX_STACK) {
