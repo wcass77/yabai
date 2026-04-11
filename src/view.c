@@ -1193,6 +1193,7 @@ bool view_scroll_step(struct view *view, int direction)
 {
     if (!view_is_scroll_layout(view)) return false;
     if (!scroll_column_count(view)) return false;
+    if (direction != DIR_EAST && direction != DIR_WEST) return false;
 
     int index = view->scroll.focused_index;
     if (!in_range_ie(index, 0, scroll_column_count(view))) index = 0;

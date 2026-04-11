@@ -83,6 +83,22 @@ TEST_FUNC(scroll_focus_state_is_idempotent,
     buf_free(view.scroll.column_list);
 });
 
+TEST_FUNC(scroll_step_rejects_unsupported_directions,
+{
+    struct view view = {0};
+    view.layout = VIEW_SCROLL;
+    view.scroll.focused_index = 0;
+
+    buf_push(view.scroll.column_list, ((struct scroll_column) { .window_id = 11, .w = 100, .h = 100 }));
+    buf_push(view.scroll.column_list, ((struct scroll_column) { .window_id = 22, .w = 100, .h = 100 }));
+
+    TEST_CHECK(view_scroll_step(&view, DIR_NORTH), false);
+    TEST_CHECK(view.scroll.focused_index, 0);
+    TEST_CHECK(view_is_dirty(&view), false);
+
+    buf_free(view.scroll.column_list);
+});
+
 TEST_FUNC(scroll_warp_moves_in_both_directions,
 {
     struct view view = {0};
