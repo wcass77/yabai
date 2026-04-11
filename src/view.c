@@ -186,12 +186,14 @@ static float scroll_view_total_width(struct view *view)
     return last->x + last->w;
 }
 
-static int scroll_view_focus_index_after_removal(int count, int removed_index)
+static int scroll_view_focus_index_after_removal(int count, int removed_index, int current_focus_index)
 {
     int next_count = count - 1;
     if (next_count <= 0) return -1;
-    if (removed_index < next_count) return removed_index;
-    return next_count - 1;
+    if (!in_range_ie(current_focus_index, 0, count)) return min(removed_index, next_count - 1);
+    if (removed_index == current_focus_index) return min(removed_index, next_count - 1);
+    if (removed_index < current_focus_index) return current_focus_index - 1;
+    return current_focus_index;
 }
 
 static void scroll_view_center_on_index(struct view *view, int index)
@@ -765,7 +767,7 @@ struct window_node *view_remove_window_node(struct view *view, struct window *wi
         }
         buf__hdr(view->scroll.column_list)->len--;
 
-        view->scroll.focused_index = scroll_view_focus_index_after_removal(count, index);
+        view->scroll.focused_index = scroll_view_focus_index_after_removal(count, index, view->scroll.focused_index);
 
         if (view->insertion_point == window->id) {
             view->insertion_point = view->scroll.focused_index >= 0 ? view->scroll.column_list[view->scroll.focused_index].window_id : 0;

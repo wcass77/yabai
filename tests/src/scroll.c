@@ -53,9 +53,11 @@ TEST_FUNC(scroll_viewport_centering_and_edge_peek,
 
 TEST_FUNC(scroll_focus_index_after_removal,
 {
-    TEST_CHECK(scroll_view_focus_index_after_removal(3, 1), 1);
-    TEST_CHECK(scroll_view_focus_index_after_removal(3, 2), 1);
-    TEST_CHECK(scroll_view_focus_index_after_removal(1, 0), -1);
+    TEST_CHECK(scroll_view_focus_index_after_removal(3, 1, 1), 1);
+    TEST_CHECK(scroll_view_focus_index_after_removal(3, 2, 2), 1);
+    TEST_CHECK(scroll_view_focus_index_after_removal(3, 0, 2), 1);
+    TEST_CHECK(scroll_view_focus_index_after_removal(3, 2, 0), 0);
+    TEST_CHECK(scroll_view_focus_index_after_removal(1, 0, 0), -1);
 });
 
 TEST_FUNC(scroll_focus_state_is_idempotent,
