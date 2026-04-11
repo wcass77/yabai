@@ -726,6 +726,37 @@ void window_manager_animate_window_list(struct window_capture *window_list, int 
     }
 }
 
+bool window_manager_is_window_animating_to_origin(struct window_manager *wm, uint32_t wid, float x, float y)
+{
+    bool result = false;
+
+    pthread_mutex_lock(&wm->window_animations_lock);
+    struct window_animation *animation = table_find(&wm->window_animations_table, &wid);
+    if (animation && !__atomic_load_n(&animation->skip, __ATOMIC_RELAXED)) {
+        result = !AX_DIFF(animation->x, x) && !AX_DIFF(animation->y, y);
+    }
+    pthread_mutex_unlock(&wm->window_animations_lock);
+
+    return result;
+}
+
+bool window_manager_is_window_animating_to_frame(struct window_manager *wm, uint32_t wid, float x, float y, float w, float h)
+{
+    bool result = false;
+
+    pthread_mutex_lock(&wm->window_animations_lock);
+    struct window_animation *animation = table_find(&wm->window_animations_table, &wid);
+    if (animation && !__atomic_load_n(&animation->skip, __ATOMIC_RELAXED)) {
+        result = !AX_DIFF(animation->x, x) &&
+                 !AX_DIFF(animation->y, y) &&
+                 !AX_DIFF(animation->w, w) &&
+                 !AX_DIFF(animation->h, h);
+    }
+    pthread_mutex_unlock(&wm->window_animations_lock);
+
+    return result;
+}
+
 void window_manager_animate_window(struct window_capture capture)
 {
     TIME_FUNCTION;

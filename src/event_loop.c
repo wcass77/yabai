@@ -679,7 +679,11 @@ static EVENT_HANDLER(WINDOW_MOVED)
                 struct window_node *node = view_find_window_node(view, window->id);
                 if (view->layout == VIEW_SCROLL) {
                     if (space_is_visible(view->sid)) {
-                        view_flush(view);
+                        if (window_manager_is_window_animating_to_origin(&g_window_manager, window->id, new_origin.x, new_origin.y)) {
+                            view_set_flag(view, VIEW_IS_DIRTY);
+                        } else {
+                            view_flush(view);
+                        }
                     } else {
                         view_set_flag(view, VIEW_IS_DIRTY);
                     }
@@ -784,7 +788,15 @@ static EVENT_HANDLER(WINDOW_RESIZED)
                 struct window_node *node = view_find_window_node(view, window->id);
                     if (view->layout == VIEW_SCROLL) {
                         if (space_is_visible(view->sid)) {
-                            view_flush(view);
+                            if (window_manager_is_window_animating_to_frame(&g_window_manager, window->id,
+                                                                            new_frame.origin.x,
+                                                                            new_frame.origin.y,
+                                                                            new_frame.size.width,
+                                                                            new_frame.size.height)) {
+                                view_set_flag(view, VIEW_IS_DIRTY);
+                            } else {
+                                view_flush(view);
+                            }
                         } else {
                             view_set_flag(view, VIEW_IS_DIRTY);
                         }
