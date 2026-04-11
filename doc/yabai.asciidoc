@@ -406,7 +406,8 @@ COMMAND
 
 *--stack* '<WINDOW_SEL>'::
     Stack the given window on top of the selected window. +
-    Any kind of warp operation performed on a stacked window will unstack it.
+    Any kind of warp operation performed on a stacked window will unstack it. +
+    Not supported on *scroll* spaces.
 
 *--insert* '<DIR_SEL>|stack'::
     Set the splitting mode of the selected window. +
