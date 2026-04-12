@@ -40,6 +40,23 @@ static void flush_dirty_visible_views(struct view **view_list, int view_count)
     }
 }
 
+static bool should_defer_scroll_relayout(struct view *view, struct window *window, CGRect target_frame, bool include_size)
+{
+    if (!space_is_visible(view->sid)) return true;
+
+    if (include_size) {
+        return window_manager_is_window_animating_to_frame(&g_window_manager, window->id,
+                                                           target_frame.origin.x,
+                                                           target_frame.origin.y,
+                                                           target_frame.size.width,
+                                                           target_frame.size.height);
+    }
+
+    return window_manager_is_window_animating_to_origin(&g_window_manager, window->id,
+                                                        target_frame.origin.x,
+                                                        target_frame.origin.y);
+}
+
 static void window_did_receive_focus(struct window_manager *wm, struct mouse_state *ms, struct window *window)
 {
     struct window *focused_window = window_manager_find_window(wm, wm->focused_window_id);
@@ -666,14 +683,11 @@ static EVENT_HANDLER(WINDOW_MOVED)
             if (view) {
                 struct window_node *node = view_find_window_node(view, window->id);
                 if (view->layout == VIEW_SCROLL) {
-                    if (space_is_visible(view->sid)) {
-                        if (window_manager_is_window_animating_to_origin(&g_window_manager, window->id, new_origin.x, new_origin.y)) {
-                            view_set_flag(view, VIEW_IS_DIRTY);
-                        } else {
-                            view_flush(view);
-                        }
-                    } else {
+                    CGRect target_frame = { .origin = new_origin };
+                    if (should_defer_scroll_relayout(view, window, target_frame, false)) {
                         view_set_flag(view, VIEW_IS_DIRTY);
+                    } else {
+                        view_flush(view);
                     }
                 } else if (node && (AX_DIFF(node->area.x, new_origin.x) ||
                                     AX_DIFF(node->area.y, new_origin.y))
@@ -775,18 +789,10 @@ static EVENT_HANDLER(WINDOW_RESIZED)
                 if (view) {
                 struct window_node *node = view_find_window_node(view, window->id);
                     if (view->layout == VIEW_SCROLL) {
-                        if (space_is_visible(view->sid)) {
-                            if (window_manager_is_window_animating_to_frame(&g_window_manager, window->id,
-                                                                            new_frame.origin.x,
-                                                                            new_frame.origin.y,
-                                                                            new_frame.size.width,
-                                                                            new_frame.size.height)) {
-                                view_set_flag(view, VIEW_IS_DIRTY);
-                            } else {
-                                view_flush(view);
-                            }
-                        } else {
+                        if (should_defer_scroll_relayout(view, window, new_frame, true)) {
                             view_set_flag(view, VIEW_IS_DIRTY);
+                        } else {
+                            view_flush(view);
                         }
                     } else if (node && (AX_DIFF(node->area.x, new_frame.origin.x)   ||
                                         AX_DIFF(node->area.y, new_frame.origin.y)   ||
