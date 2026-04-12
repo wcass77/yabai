@@ -2067,22 +2067,30 @@ static void handle_domain_space(FILE *rsp, struct token domain, char *message)
             if (!view || view->layout != VIEW_SCROLL) {
                 daemon_fail(rsp, "cannot scroll a non-scroll space.\n");
             } else if (token_equals(value, ARGUMENT_COMMON_SEL_PREV) || token_equals(value, ARGUMENT_COMMON_SEL_WEST)) {
-                if (view_scroll_step(view, DIR_WEST)) {
+                if (!view_scroll_step(view, DIR_WEST)) {
+                    daemon_fail(rsp, "could not locate the previous scroll column.\n");
+                } else {
                     flush_or_dirty_scroll_view(view);
                 }
             } else if (token_equals(value, ARGUMENT_COMMON_SEL_NEXT) || token_equals(value, ARGUMENT_COMMON_SEL_EAST)) {
-                if (view_scroll_step(view, DIR_EAST)) {
+                if (!view_scroll_step(view, DIR_EAST)) {
+                    daemon_fail(rsp, "could not locate the next scroll column.\n");
+                } else {
                     flush_or_dirty_scroll_view(view);
                 }
             } else if (token_equals(value, ARGUMENT_COMMON_SEL_FIRST)) {
                 uint32_t window_id = view_find_first_window_id(view);
-                if (window_id) {
+                if (!window_id) {
+                    daemon_fail(rsp, "could not locate the first scroll column.\n");
+                } else {
                     view_set_focused_window(view, window_id);
                     flush_or_dirty_scroll_view(view);
                 }
             } else if (token_equals(value, ARGUMENT_COMMON_SEL_LAST)) {
                 uint32_t window_id = view_find_last_window_id(view);
-                if (window_id) {
+                if (!window_id) {
+                    daemon_fail(rsp, "could not locate the last scroll column.\n");
+                } else {
                     view_set_focused_window(view, window_id);
                     flush_or_dirty_scroll_view(view);
                 }

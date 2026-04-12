@@ -1177,7 +1177,9 @@ static EVENT_HANDLER(MOUSE_UP)
             enum mouse_drop_action drop_action = mouse_determine_drop_action(&g_mouse_state, a_node, window, point);
             switch (drop_action) {
             case MOUSE_DROP_ACTION_STACK: {
-                mouse_drop_action_stack(&g_window_manager, src_view, g_mouse_state.window, dst_view, window);
+                if (!mouse_drop_action_stack(&g_window_manager, src_view, g_mouse_state.window, dst_view, window)) {
+                    window_node_flush(a_node);
+                }
             } break;
             case MOUSE_DROP_ACTION_SWAP: {
                 mouse_drop_action_swap(&g_window_manager, src_view, a_node, g_mouse_state.window, dst_view, b_node, window);
