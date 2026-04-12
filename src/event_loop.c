@@ -29,6 +29,34 @@ static void update_window_notifications(void)
     SLSRequestNotificationsForWindows(g_connection, window_list, window_count);
 }
 
+static void flush_dirty_visible_views(struct view **view_list, int view_count)
+{
+    for (int i = 0; i < view_count; ++i) {
+        struct view *view = view_list[i];
+        if (!space_is_visible(view->sid)) continue;
+        if (!view_is_dirty(view))         continue;
+
+        view_flush(view);
+    }
+}
+
+static bool should_defer_scroll_relayout(struct view *view, struct window *window, CGRect target_frame, bool include_size)
+{
+    if (!space_is_visible(view->sid)) return true;
+
+    if (include_size) {
+        return window_manager_is_window_animating_to_frame(&g_window_manager, window->id,
+                                                           target_frame.origin.x,
+                                                           target_frame.origin.y,
+                                                           target_frame.size.width,
+                                                           target_frame.size.height);
+    }
+
+    return window_manager_is_window_animating_to_origin(&g_window_manager, window->id,
+                                                        target_frame.origin.x,
+                                                        target_frame.origin.y);
+}
+
 static void window_did_receive_focus(struct window_manager *wm, struct mouse_state *ms, struct window *window)
 {
     struct window *focused_window = window_manager_find_window(wm, wm->focused_window_id);
@@ -52,6 +80,17 @@ static void window_did_receive_focus(struct window_manager *wm, struct mouse_sta
 
     struct view *view = window_manager_find_managed_window(&g_window_manager, window);
     if (!view) return;
+
+    if (view->layout == VIEW_SCROLL) {
+        if (view_set_focused_window(view, window->id) || view_is_dirty(view)) {
+            if (space_is_visible(view->sid)) {
+                view_flush(view);
+            } else {
+                view_set_flag(view, VIEW_IS_DIRTY);
+            }
+        }
+        return;
+    }
 
     struct window_node *node = view_find_window_node(view, window->id);
     if (node->window_count <= 1) return;
@@ -229,14 +268,7 @@ static EVENT_HANDLER(APPLICATION_LAUNCHED)
     // This is necessary to make sure that we do not call the AX API for each modification to the tree.
     //
 
-    for (int i = 0; i < view_count; ++i) {
-        struct view *view = view_list[i];
-        if (!space_is_visible(view->sid)) continue;
-        if (!view_is_dirty(view))         continue;
-
-        window_node_flush(view->root);
-        view_clear_flag(view, VIEW_IS_DIRTY);
-    }
+    flush_dirty_visible_views(view_list, view_count);
 
     if (workspace_is_macos_sequoia() || workspace_is_macos_tahoe()) {
         update_window_notifications();
@@ -322,14 +354,7 @@ static EVENT_HANDLER(APPLICATION_TERMINATED)
     // This is necessary to make sure that we do not call the AX API for each modification to the tree.
     //
 
-    for (int i = 0; i < view_count; ++i) {
-        struct view *view = view_list[i];
-        if (!space_is_visible(view->sid)) continue;
-        if (!view_is_dirty(view))         continue;
-
-        window_node_flush(view->root);
-        view_clear_flag(view, VIEW_IS_DIRTY);
-    }
+    flush_dirty_visible_views(view_list, view_count);
 
     if (workspace_is_macos_sequoia() || workspace_is_macos_tahoe()) {
         update_window_notifications();
@@ -451,14 +476,7 @@ static EVENT_HANDLER(APPLICATION_VISIBLE)
     // This is necessary to make sure that we do not call the AX API for each modification to the tree.
     //
 
-    for (int i = 0; i < view_count; ++i) {
-        struct view *view = view_list[i];
-        if (!space_is_visible(view->sid)) continue;
-        if (!view_is_dirty(view))         continue;
-
-        window_node_flush(view->root);
-        view_clear_flag(view, VIEW_IS_DIRTY);
-    }
+    flush_dirty_visible_views(view_list, view_count);
 
     event_signal_push(SIGNAL_APPLICATION_VISIBLE, application);
 }
@@ -512,14 +530,7 @@ static EVENT_HANDLER(APPLICATION_HIDDEN)
     // This is necessary to make sure that we do not call the AX API for each modification to the tree.
     //
 
-    for (int i = 0; i < view_count; ++i) {
-        struct view *view = view_list[i];
-        if (!space_is_visible(view->sid)) continue;
-        if (!view_is_dirty(view))         continue;
-
-        window_node_flush(view->root);
-        view_clear_flag(view, VIEW_IS_DIRTY);
-    }
+    flush_dirty_visible_views(view_list, view_count);
 
     event_signal_push(SIGNAL_APPLICATION_HIDDEN, application);
 }
@@ -671,11 +682,18 @@ static EVENT_HANDLER(WINDOW_MOVED)
             struct view *view = window_manager_find_managed_window(&g_window_manager, window);
             if (view) {
                 struct window_node *node = view_find_window_node(view, window->id);
-                if (node && (AX_DIFF(node->area.x, new_origin.x) ||
-                             AX_DIFF(node->area.y, new_origin.y))
-                         &&
-                   (!node->zoom || AX_DIFF(node->zoom->area.x, new_origin.x) ||
-                                   AX_DIFF(node->zoom->area.y, new_origin.y))) {
+                if (view->layout == VIEW_SCROLL) {
+                    CGRect target_frame = { .origin = new_origin };
+                    if (should_defer_scroll_relayout(view, window, target_frame, false)) {
+                        view_set_flag(view, VIEW_IS_DIRTY);
+                    } else {
+                        view_flush(view);
+                    }
+                } else if (node && (AX_DIFF(node->area.x, new_origin.x) ||
+                                    AX_DIFF(node->area.y, new_origin.y))
+                                &&
+                          (!node->zoom || AX_DIFF(node->zoom->area.x, new_origin.x) ||
+                                          AX_DIFF(node->zoom->area.y, new_origin.y))) {
                     if (space_is_visible(view->sid)) {
                         window_node_flush(node);
                     } else {
@@ -769,16 +787,22 @@ static EVENT_HANDLER(WINDOW_RESIZED)
             if (!g_mouse_state.window || g_mouse_state.window != window) {
                 struct view *view = window_manager_find_managed_window(&g_window_manager, window);
                 if (view) {
-                    struct window_node *node = view_find_window_node(view, window->id);
-                    if (node && (AX_DIFF(node->area.x, new_frame.origin.x)   ||
-                                 AX_DIFF(node->area.y, new_frame.origin.y)   ||
-                                 AX_DIFF(node->area.w, new_frame.size.width) ||
-                                 AX_DIFF(node->area.h, new_frame.size.height))
-                             &&
-                       (!node->zoom || AX_DIFF(node->zoom->area.x, new_frame.origin.x)   ||
-                                       AX_DIFF(node->zoom->area.y, new_frame.origin.y)   ||
-                                       AX_DIFF(node->zoom->area.w, new_frame.size.width) ||
-                                       AX_DIFF(node->zoom->area.h, new_frame.size.height))) {
+                struct window_node *node = view_find_window_node(view, window->id);
+                    if (view->layout == VIEW_SCROLL) {
+                        if (should_defer_scroll_relayout(view, window, new_frame, true)) {
+                            view_set_flag(view, VIEW_IS_DIRTY);
+                        } else {
+                            view_flush(view);
+                        }
+                    } else if (node && (AX_DIFF(node->area.x, new_frame.origin.x)   ||
+                                        AX_DIFF(node->area.y, new_frame.origin.y)   ||
+                                        AX_DIFF(node->area.w, new_frame.size.width) ||
+                                        AX_DIFF(node->area.h, new_frame.size.height))
+                                    &&
+                              (!node->zoom || AX_DIFF(node->zoom->area.x, new_frame.origin.x)   ||
+                                              AX_DIFF(node->zoom->area.y, new_frame.origin.y)   ||
+                                              AX_DIFF(node->zoom->area.w, new_frame.size.width) ||
+                                              AX_DIFF(node->zoom->area.h, new_frame.size.height))) {
                         if (space_is_visible(view->sid)) {
                             window_node_flush(node);
                         } else {
@@ -985,8 +1009,7 @@ static EVENT_HANDLER(SPACE_CHANGED)
         }
 
         if (view_is_dirty(view)) {
-            window_node_flush(view->root);
-            view_clear_flag(view, VIEW_IS_DIRTY);
+            view_flush(view);
         }
     }
 
@@ -1037,8 +1060,7 @@ static EVENT_HANDLER(DISPLAY_CHANGED)
         }
 
         if (view_is_dirty(view)) {
-            window_node_flush(view->root);
-            view_clear_flag(view, VIEW_IS_DIRTY);
+            view_flush(view);
         }
     }
 
@@ -1161,7 +1183,9 @@ static EVENT_HANDLER(MOUSE_UP)
             enum mouse_drop_action drop_action = mouse_determine_drop_action(&g_mouse_state, a_node, window, point);
             switch (drop_action) {
             case MOUSE_DROP_ACTION_STACK: {
-                mouse_drop_action_stack(&g_window_manager, src_view, g_mouse_state.window, dst_view, window);
+                if (!mouse_drop_action_stack(&g_window_manager, src_view, g_mouse_state.window, dst_view, window)) {
+                    window_node_flush(a_node);
+                }
             } break;
             case MOUSE_DROP_ACTION_SWAP: {
                 mouse_drop_action_swap(&g_window_manager, src_view, a_node, g_mouse_state.window, dst_view, b_node, window);

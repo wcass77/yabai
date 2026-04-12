@@ -105,6 +105,7 @@ struct view *space_manager_find_view(struct space_manager *sm, uint64_t sid)
     struct view *view = table_find(&sm->view, &sid);
     if (!view) {
         view = view_create(sid);
+        if (!view) error("yabai: could not allocate view for space %lld! abort..\n", sid);
         table_add(&sm->view, &sid, view);
     }
     return view;
@@ -133,6 +134,15 @@ void space_manager_untile_window(struct view *view, struct window *window)
 
     window_manager_adjust_layer(window, LAYER_NORMAL);
     struct window_node *node = view_remove_window_node(view, window);
+    if (view->layout == VIEW_SCROLL) {
+        if (space_is_visible(view->sid)) {
+            view_flush(view);
+        } else {
+            view_set_flag(view, VIEW_IS_DIRTY);
+        }
+        return;
+    }
+
     if (!node) return;
 
     if (space_is_visible(view->sid)) {
@@ -448,6 +458,17 @@ struct view *space_manager_tile_window_on_space_with_insertion_point(struct spac
 
     window_manager_adjust_layer(window, LAYER_BELOW);
     struct window_node *node = view_add_window_node_with_insertion_point(view, window, insertion_point);
+
+    if (view->layout == VIEW_SCROLL) {
+        if (space_is_visible(view->sid)) {
+            view_flush(view);
+        } else {
+            view_set_flag(view, VIEW_IS_DIRTY);
+        }
+
+        return view;
+    }
+
     assert(node);
 
     if (space_is_visible(view->sid)) {
@@ -606,6 +627,112 @@ uint64_t space_manager_next_space(uint64_t sid)
 out:
     CFRelease(display_spaces_ref);
     return n_sid != sid ? n_sid : 0;
+}
+
+uint64_t space_manager_prev_user_space_in_list(uint64_t *space_list, int count, uint64_t sid)
+{
+    uint64_t prev_sid = 0;
+
+    for (int i = 0; i < count; ++i) {
+        if (space_list[i] == sid) return prev_sid;
+        prev_sid = space_list[i];
+    }
+
+    return 0;
+}
+
+uint64_t space_manager_next_user_space_in_list(uint64_t *space_list, int count, uint64_t sid)
+{
+    bool found_sid = false;
+
+    for (int i = 0; i < count; ++i) {
+        if (found_sid) return space_list[i];
+        found_sid = space_list[i] == sid;
+    }
+
+    return 0;
+}
+
+#ifdef TESTS
+static uint32_t g_test_display_space_list_did;
+static uint64_t *g_test_display_space_list;
+static int g_test_display_space_count;
+static uint64_t *g_test_user_space_list;
+static int g_test_user_space_count;
+
+static void space_manager_set_test_display_user_spaces(uint32_t did, uint64_t *space_list, int space_count, uint64_t *user_space_list, int user_space_count)
+{
+    g_test_display_space_list_did = did;
+    g_test_display_space_list = space_list;
+    g_test_display_space_count = space_count;
+    g_test_user_space_list = user_space_list;
+    g_test_user_space_count = user_space_count;
+}
+
+static uint64_t *space_manager_display_space_list(uint32_t did, int *count)
+{
+    if (g_test_display_space_list && did == g_test_display_space_list_did) {
+        *count = g_test_display_space_count;
+        return g_test_display_space_list;
+    }
+
+    return display_space_list(did, count);
+}
+
+static bool space_manager_space_is_user(uint64_t sid)
+{
+    if (g_test_user_space_list) {
+        for (int i = 0; i < g_test_user_space_count; ++i) {
+            if (g_test_user_space_list[i] == sid) return true;
+        }
+
+        return false;
+    }
+
+    return space_is_user(sid);
+}
+#else
+static uint64_t *space_manager_display_space_list(uint32_t did, int *count)
+{
+    return display_space_list(did, count);
+}
+
+static bool space_manager_space_is_user(uint64_t sid)
+{
+    return space_is_user(sid);
+}
+#endif
+
+uint64_t space_manager_prev_user_space_on_display(uint32_t did, uint64_t sid)
+{
+    int count;
+    uint64_t *space_list = space_manager_display_space_list(did, &count);
+    if (!space_list) return 0;
+
+    uint64_t *user_space_list = ts_alloc_list(uint64_t, count);
+    int user_space_count = 0;
+
+    for (int i = 0; i < count; ++i) {
+        if (space_manager_space_is_user(space_list[i])) user_space_list[user_space_count++] = space_list[i];
+    }
+
+    return space_manager_prev_user_space_in_list(user_space_list, user_space_count, sid);
+}
+
+uint64_t space_manager_next_user_space_on_display(uint32_t did, uint64_t sid)
+{
+    int count;
+    uint64_t *space_list = space_manager_display_space_list(did, &count);
+    if (!space_list) return 0;
+
+    uint64_t *user_space_list = ts_alloc_list(uint64_t, count);
+    int user_space_count = 0;
+
+    for (int i = 0; i < count; ++i) {
+        if (space_manager_space_is_user(space_list[i])) user_space_list[user_space_count++] = space_list[i];
+    }
+
+    return space_manager_next_user_space_in_list(user_space_list, user_space_count, sid);
 }
 
 uint64_t space_manager_first_space(void)

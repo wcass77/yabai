@@ -34,7 +34,7 @@ yabai \- window manager
 \fByabai\fP [\fB\-\-load\-sa\fP|\fB\-\-uninstall\-sa\fP|\fB\-\-install\-service\fP|\fB\-\-uninstall\-service\fP|\fB\-\-start\-service\fP|\fB\-\-restart\-service\fP|\fB\-\-stop\-service\fP|\fB\-\-message\fP,\fB\-m\fP \fImsg\fP|\fB\-\-config\fP,\fB\-c\fP \fIconfig_file\fP|\fB\-\-verbose\fP,\fB\-V\fP|\fB\-\-version\fP,\fB\-v\fP|\fB\-\-help\fP,\fB\-h\fP]
 .SH "DESCRIPTION"
 .sp
-\fByabai\fP is a tiling window manager for macOS based on binary space partitioning.
+\fByabai\fP is a tiling window manager for macOS supporting binary space partitioning, stack, float, and horizontally scrollable workspaces.
 .SH "OPTIONS"
 .sp
 \fB\-\-load\-sa\fP
@@ -331,9 +331,10 @@ Action performed when a bsp\-managed window is dropped in the center of some oth
 .RE
 .SS "Space Settings"
 .sp
-\fBlayout\fP [\fIbsp|stack|float\fP]
+\fBlayout\fP [\fIbsp|stack|float|scroll\fP]
 .RS 4
 Set the layout of the selected space.
+In \fBscroll\fP layout, managed windows are arranged as horizontal columns and the focused column is kept visible while the workspace scrolls.
 .RE
 .sp
 \fBsplit_type\fP [\fIvertical|horizontal|auto\fP]
@@ -512,9 +513,16 @@ Size of the gap that separates windows on the selected space.
 Toggle space setting on or off for the selected space.
 .RE
 .sp
-\fB\-\-layout\fP \fIbsp|stack|float\fP
+\fB\-\-layout\fP \fIbsp|stack|float|scroll\fP
 .RS 4
 Set the layout of the selected space.
+.RE
+.sp
+\fB\-\-scroll\fP \fIprev|next|first|last|west|east\fP
+.RS 4
+Scroll the selected \fBscroll\fP space by one column or jump to the first/last column, focusing the target column when the space is visible.
+.br
+Boundary scrolls are no\-ops. Use this command from keybindings for scroll workspace navigation.
 .RE
 .sp
 \fB\-\-label\fP [\fI<LABEL>\fP]
@@ -577,11 +585,13 @@ System Integrity Protection must be partially disabled on macOS Monterey 12.7+, 
 \fB\-\-swap\fP \fI<WINDOW_SEL>\fP
 .RS 4
 Swap position of the selected window and the given window.
+On \fBscroll\fP spaces, this swaps column order.
 .RE
 .sp
 \fB\-\-warp\fP \fI<WINDOW_SEL>\fP
 .RS 4
 Re\-insert the selected window, splitting the given window.
+On \fBscroll\fP spaces, this reorders the selected column relative to the given column.
 .RE
 .sp
 \fB\-\-stack\fP \fI<WINDOW_SEL>\fP
@@ -589,6 +599,7 @@ Re\-insert the selected window, splitting the given window.
 Stack the given window on top of the selected window.
 .br
 Any kind of warp operation performed on a stacked window will unstack it.
+Not supported on \fBscroll\fP spaces.
 .RE
 .sp
 \fB\-\-insert\fP \fI<DIR_SEL>|stack\fP
@@ -596,6 +607,7 @@ Any kind of warp operation performed on a stacked window will unstack it.
 Set the splitting mode of the selected window.
 .br
 If the current splitting mode matches the selected mode, the action will be undone.
+Not supported on \fBscroll\fP spaces.
 .RE
 .sp
 \fB\-\-grid\fP \fI<rows>:<cols>:<start\-x>:<start\-y>:<width>:<height>\fP
@@ -615,6 +627,7 @@ If type is \fIabs\fP \fIdx\fP and \fIdy\fP will become the new position.
 Resize the selected window by moving the given handle \fIdx\fP pixels horizontally and \fIdy\fP pixels vertically.
 .br
 If handle is \fIabs\fP the new size will be \fIdx\fP width and \fIdy\fP height and cannot be used on managed windows.
+On \fBscroll\fP spaces, only left/right resizing is supported.
 .RE
 .sp
 \fB\-\-ratio\fP \fIrel|abs:<dr>\fP
@@ -622,6 +635,7 @@ If handle is \fIabs\fP the new size will be \fIdx\fP width and \fIdy\fP height a
 If type is \fIrel\fP the split ratio of the selected window is changed by \fIdr\fP, otherwise \fIdr\fP will become the new split ratio.
 .br
 A positive/negative delta will increase/decrease the size of the left\-child.
+Not supported on \fBscroll\fP spaces.
 .RE
 .sp
 \fB\-\-toggle\fP \fIfloat|sticky|pip|shadow|split|zoom\-parent|zoom\-fullscreen|windowed\-fullscreen|native\-fullscreen|expose|<LABEL>\fP
@@ -629,8 +643,8 @@ A positive/negative delta will increase/decrease the size of the left\-child.
 Toggle the given property of the selected window.
 .br
 The following properties require System Integrity Protection to be partially disabled: sticky, pip, shadow, LABEL (scratchpad identifier) .
+The \fBsplit\fP toggle is not supported on \fBscroll\fP spaces.
 .RE
-.sp
 \fB\-\-sub\-layer\fP \fI<LAYER>\fP
 .RS 4
 Set the stacking sub\-layer of the selected window.
