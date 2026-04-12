@@ -1,3 +1,28 @@
+struct scroll_global_state
+{
+    enum window_insertion_point window_insertion_point;
+    uint32_t focused_window_id;
+};
+
+static struct scroll_global_state push_scroll_global_state(enum window_insertion_point window_insertion_point, uint32_t focused_window_id)
+{
+    struct scroll_global_state state = {
+        .window_insertion_point = g_space_manager.window_insertion_point,
+        .focused_window_id = g_window_manager.focused_window_id,
+    };
+
+    g_space_manager.window_insertion_point = window_insertion_point;
+    g_window_manager.focused_window_id = focused_window_id;
+
+    return state;
+}
+
+static void pop_scroll_global_state(struct scroll_global_state state)
+{
+    g_space_manager.window_insertion_point = state.window_insertion_point;
+    g_window_manager.focused_window_id = state.focused_window_id;
+}
+
 TEST_FUNC(scroll_window_order_navigation,
 {
     struct view view = {0};
@@ -101,11 +126,7 @@ TEST_FUNC(scroll_step_rejects_unsupported_directions,
 
 TEST_FUNC(scroll_background_insert_preserves_focus,
 {
-    enum window_insertion_point old_insertion_point = g_space_manager.window_insertion_point;
-    uint32_t old_focused_window_id = g_window_manager.focused_window_id;
-
-    g_space_manager.window_insertion_point = INSERT_FIRST;
-    g_window_manager.focused_window_id = 22;
+    struct scroll_global_state state = push_scroll_global_state(INSERT_FIRST, 22);
 
     struct view view = {0};
     view.layout = VIEW_SCROLL;
@@ -125,17 +146,12 @@ TEST_FUNC(scroll_background_insert_preserves_focus,
     TEST_CHECK(view.scroll.focused_index, 2);
 
     buf_free(view.scroll.column_list);
-    g_space_manager.window_insertion_point = old_insertion_point;
-    g_window_manager.focused_window_id = old_focused_window_id;
+    pop_scroll_global_state(state);
 });
 
 TEST_FUNC(scroll_focused_insert_updates_focus,
 {
-    enum window_insertion_point old_insertion_point = g_space_manager.window_insertion_point;
-    uint32_t old_focused_window_id = g_window_manager.focused_window_id;
-
-    g_space_manager.window_insertion_point = INSERT_LAST;
-    g_window_manager.focused_window_id = 33;
+    struct scroll_global_state state = push_scroll_global_state(INSERT_LAST, 33);
 
     struct view view = {0};
     view.layout = VIEW_SCROLL;
@@ -154,8 +170,7 @@ TEST_FUNC(scroll_focused_insert_updates_focus,
     TEST_CHECK(view.scroll.focused_index, 2);
 
     buf_free(view.scroll.column_list);
-    g_space_manager.window_insertion_point = old_insertion_point;
-    g_window_manager.focused_window_id = old_focused_window_id;
+    pop_scroll_global_state(state);
 });
 
 TEST_FUNC(scroll_warp_moves_in_both_directions,

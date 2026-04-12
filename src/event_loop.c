@@ -29,6 +29,17 @@ static void update_window_notifications(void)
     SLSRequestNotificationsForWindows(g_connection, window_list, window_count);
 }
 
+static void flush_dirty_visible_views(struct view **view_list, int view_count)
+{
+    for (int i = 0; i < view_count; ++i) {
+        struct view *view = view_list[i];
+        if (!space_is_visible(view->sid)) continue;
+        if (!view_is_dirty(view))         continue;
+
+        view_flush(view);
+    }
+}
+
 static void window_did_receive_focus(struct window_manager *wm, struct mouse_state *ms, struct window *window)
 {
     struct window *focused_window = window_manager_find_window(wm, wm->focused_window_id);
@@ -240,13 +251,7 @@ static EVENT_HANDLER(APPLICATION_LAUNCHED)
     // This is necessary to make sure that we do not call the AX API for each modification to the tree.
     //
 
-    for (int i = 0; i < view_count; ++i) {
-        struct view *view = view_list[i];
-        if (!space_is_visible(view->sid)) continue;
-        if (!view_is_dirty(view))         continue;
-
-        view_flush(view);
-    }
+    flush_dirty_visible_views(view_list, view_count);
 
     if (workspace_is_macos_sequoia() || workspace_is_macos_tahoe()) {
         update_window_notifications();
@@ -332,13 +337,7 @@ static EVENT_HANDLER(APPLICATION_TERMINATED)
     // This is necessary to make sure that we do not call the AX API for each modification to the tree.
     //
 
-    for (int i = 0; i < view_count; ++i) {
-        struct view *view = view_list[i];
-        if (!space_is_visible(view->sid)) continue;
-        if (!view_is_dirty(view))         continue;
-
-        view_flush(view);
-    }
+    flush_dirty_visible_views(view_list, view_count);
 
     if (workspace_is_macos_sequoia() || workspace_is_macos_tahoe()) {
         update_window_notifications();
@@ -460,13 +459,7 @@ static EVENT_HANDLER(APPLICATION_VISIBLE)
     // This is necessary to make sure that we do not call the AX API for each modification to the tree.
     //
 
-    for (int i = 0; i < view_count; ++i) {
-        struct view *view = view_list[i];
-        if (!space_is_visible(view->sid)) continue;
-        if (!view_is_dirty(view))         continue;
-
-        view_flush(view);
-    }
+    flush_dirty_visible_views(view_list, view_count);
 
     event_signal_push(SIGNAL_APPLICATION_VISIBLE, application);
 }
@@ -520,13 +513,7 @@ static EVENT_HANDLER(APPLICATION_HIDDEN)
     // This is necessary to make sure that we do not call the AX API for each modification to the tree.
     //
 
-    for (int i = 0; i < view_count; ++i) {
-        struct view *view = view_list[i];
-        if (!space_is_visible(view->sid)) continue;
-        if (!view_is_dirty(view))         continue;
-
-        view_flush(view);
-    }
+    flush_dirty_visible_views(view_list, view_count);
 
     event_signal_push(SIGNAL_APPLICATION_HIDDEN, application);
 }
