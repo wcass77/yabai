@@ -470,6 +470,7 @@ struct view *space_manager_tile_window_on_space_with_insertion_point(struct spac
     }
 
     assert(node);
+    window_manager_order_window_after_insert(view, window);
 
     if (space_is_visible(view->sid)) {
         window_node_flush(node);

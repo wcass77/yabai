@@ -18,6 +18,16 @@ static char osax_payload_plist[MAXLEN];
 static char osax_bin_payload[MAXLEN];
 static char osax_bin_loader[MAXLEN];
 
+#ifdef TESTS
+static struct
+{
+    uint32_t a_wid;
+    int order;
+    uint32_t b_wid;
+    int count;
+} g_test_scripting_addition_order_window;
+#endif
+
 static char sa_plist[] =
     "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
     "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
@@ -575,11 +585,19 @@ bool scripting_addition_swap_window_proxy_out(struct window_animation *animation
 
 bool scripting_addition_order_window(uint32_t a_wid, int order, uint32_t b_wid)
 {
+#ifdef TESTS
+    g_test_scripting_addition_order_window.a_wid = a_wid;
+    g_test_scripting_addition_order_window.order = order;
+    g_test_scripting_addition_order_window.b_wid = b_wid;
+    ++g_test_scripting_addition_order_window.count;
+    return true;
+#else
     sa_payload_init();
     pack(a_wid);
     pack(order);
     pack(b_wid);
     return sa_payload_send(SA_OPCODE_WINDOW_ORDER);
+#endif
 }
 
 extern int g_connection;
