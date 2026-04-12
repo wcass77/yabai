@@ -239,3 +239,48 @@ TEST_FUNC(display_local_user_space_navigation,
     TEST_CHECK((int) space_manager_next_user_space_in_list(user_space_list, array_count(user_space_list), 202), 303);
     TEST_CHECK((int) space_manager_next_user_space_in_list(user_space_list, array_count(user_space_list), 303), 0);
 });
+
+TEST_FUNC(display_local_user_space_navigation_wrappers,
+{
+    if (!g_temp_storage.memory) {
+        TEST_CHECK(ts_init(MEGABYTES(1)), true);
+    }
+
+    uint64_t display_one_spaces[5];
+    display_one_spaces[0] = 900;
+    display_one_spaces[1] = 101;
+    display_one_spaces[2] = 800;
+    display_one_spaces[3] = 202;
+    display_one_spaces[4] = 303;
+
+    uint64_t display_two_spaces[3];
+    display_two_spaces[0] = 700;
+    display_two_spaces[1] = 401;
+    display_two_spaces[2] = 600;
+
+    uint64_t user_spaces[4];
+    user_spaces[0] = 101;
+    user_spaces[1] = 202;
+    user_spaces[2] = 303;
+    user_spaces[3] = 401;
+
+    space_manager_set_test_display_user_spaces(1, display_one_spaces, array_count(display_one_spaces), user_spaces, array_count(user_spaces));
+
+    TEST_CHECK((int) space_manager_prev_user_space_on_display(1, 101), 0);
+    TEST_CHECK((int) space_manager_prev_user_space_on_display(1, 202), 101);
+    TEST_CHECK((int) space_manager_prev_user_space_on_display(1, 303), 202);
+    TEST_CHECK((int) space_manager_next_user_space_on_display(1, 101), 202);
+    TEST_CHECK((int) space_manager_next_user_space_on_display(1, 202), 303);
+    TEST_CHECK((int) space_manager_next_user_space_on_display(1, 303), 0);
+    TEST_CHECK((int) space_manager_next_user_space_on_display(1, 401), 0);
+
+    ts_reset();
+    space_manager_set_test_display_user_spaces(2, display_two_spaces, array_count(display_two_spaces), user_spaces, array_count(user_spaces));
+
+    TEST_CHECK((int) space_manager_prev_user_space_on_display(2, 401), 0);
+    TEST_CHECK((int) space_manager_next_user_space_on_display(2, 401), 0);
+    TEST_CHECK((int) space_manager_prev_user_space_on_display(2, 202), 0);
+
+    ts_reset();
+    space_manager_set_test_display_user_spaces(0, NULL, 0, NULL, 0);
+});

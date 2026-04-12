@@ -27,7 +27,8 @@ typedef TEST_SIG(function);
     TEST_ENTRY(scroll_focused_insert_updates_focus)             \
     TEST_ENTRY(scroll_warp_moves_in_both_directions)           \
     TEST_ENTRY(scroll_warp_preserves_unmoved_focus)             \
-    TEST_ENTRY(display_local_user_space_navigation)
+    TEST_ENTRY(display_local_user_space_navigation)             \
+    TEST_ENTRY(display_local_user_space_navigation_wrappers)
 
 static struct {
     char *name;
