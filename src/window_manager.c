@@ -1349,7 +1349,7 @@ void window_manager_focus_window_without_raise(ProcessSerialNumber *window_psn, 
 
     struct window *window = window_manager_find_window(&g_window_manager, window_id);
     struct view *view = window ? window_manager_find_managed_window(&g_window_manager, window) : NULL;
-    if (view && view->layout == VIEW_SCROLL && space_is_visible(view->sid) &&
+    if (view && view->layout == VIEW_SCROLL &&
         (view_set_focused_window(view, window_id) || view_is_dirty(view))) {
         view_flush(view);
     }
@@ -1387,7 +1387,7 @@ void window_manager_focus_window_with_raise(ProcessSerialNumber *window_psn, uin
 
     struct window *window = window_manager_find_window(&g_window_manager, window_id);
     struct view *view = window ? window_manager_find_managed_window(&g_window_manager, window) : NULL;
-    if (view && view->layout == VIEW_SCROLL && space_is_visible(view->sid) &&
+    if (view && view->layout == VIEW_SCROLL &&
         (view_set_focused_window(view, window_id) || view_is_dirty(view))) {
         view_flush(view);
     }

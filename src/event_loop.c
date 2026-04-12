@@ -54,7 +54,7 @@ static void window_did_receive_focus(struct window_manager *wm, struct mouse_sta
     if (!view) return;
 
     if (view->layout == VIEW_SCROLL) {
-        if (view_set_focused_window(view, window->id)) {
+        if (view_set_focused_window(view, window->id) || view_is_dirty(view)) {
             if (space_is_visible(view->sid)) {
                 view_flush(view);
             } else {

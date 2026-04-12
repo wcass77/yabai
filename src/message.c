@@ -1770,6 +1770,16 @@ static void focus_visible_scroll_column(struct view *view)
     }
 }
 
+static void flush_or_dirty_scroll_view(struct view *view)
+{
+    if (space_is_visible(view->sid)) {
+        view_flush(view);
+        focus_visible_scroll_column(view);
+    } else {
+        view_set_flag(view, VIEW_IS_DIRTY);
+    }
+}
+
 static void handle_domain_space(FILE *rsp, struct token domain, char *message)
 {
     TIME_FUNCTION;
@@ -2058,27 +2068,23 @@ static void handle_domain_space(FILE *rsp, struct token domain, char *message)
                 daemon_fail(rsp, "cannot scroll a non-scroll space.\n");
             } else if (token_equals(value, ARGUMENT_COMMON_SEL_PREV) || token_equals(value, ARGUMENT_COMMON_SEL_WEST)) {
                 if (view_scroll_step(view, DIR_WEST)) {
-                    view_flush(view);
-                    focus_visible_scroll_column(view);
+                    flush_or_dirty_scroll_view(view);
                 }
             } else if (token_equals(value, ARGUMENT_COMMON_SEL_NEXT) || token_equals(value, ARGUMENT_COMMON_SEL_EAST)) {
                 if (view_scroll_step(view, DIR_EAST)) {
-                    view_flush(view);
-                    focus_visible_scroll_column(view);
+                    flush_or_dirty_scroll_view(view);
                 }
             } else if (token_equals(value, ARGUMENT_COMMON_SEL_FIRST)) {
                 uint32_t window_id = view_find_first_window_id(view);
                 if (window_id) {
                     view_set_focused_window(view, window_id);
-                    view_flush(view);
-                    focus_visible_scroll_column(view);
+                    flush_or_dirty_scroll_view(view);
                 }
             } else if (token_equals(value, ARGUMENT_COMMON_SEL_LAST)) {
                 uint32_t window_id = view_find_last_window_id(view);
                 if (window_id) {
                     view_set_focused_window(view, window_id);
-                    view_flush(view);
-                    focus_visible_scroll_column(view);
+                    flush_or_dirty_scroll_view(view);
                 }
             } else {
                 daemon_fail(rsp, "unknown value '%.*s' given to command '%.*s' for domain '%.*s'\n", value.length, value.text, command.length, command.text, domain.length, domain.text);
