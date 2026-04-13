@@ -914,7 +914,9 @@ static void view_order_window_after_insert(struct view *view, struct window *win
 
     if (node->window_count > 1) {
         if (node->window_order[0] == window->id) {
-            scripting_addition_order_window(window->id, 1, node->window_order[1]);
+            if (!scripting_addition_order_window(window->id, 1, node->window_order[1])) {
+                daemon_fail(stderr, "scripting-addition order rejected for window %u during stack insert.\n", window->id);
+            }
         }
 
         return;
@@ -927,7 +929,9 @@ static void view_order_window_after_insert(struct view *view, struct window *win
                                 : node->parent->left;
     if (!sibling || !window_node_is_leaf(sibling) || !sibling->window_count) return;
 
-    scripting_addition_order_window(window->id, 1, sibling->window_order[0]);
+    if (!scripting_addition_order_window(window->id, 1, sibling->window_order[0])) {
+        daemon_fail(stderr, "scripting-addition order rejected for window %u during bsp insert.\n", window->id);
+    }
 }
 
 struct window_node *view_add_window_node_with_insertion_point(struct view *view, struct window *window, uint32_t insertion_point)
