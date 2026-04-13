@@ -80,8 +80,6 @@ TEST_FUNC(bsp_insert_orders_above_zoomed_sibling,
     TEST_CHECK(old_node != NULL, true);
     TEST_CHECK(old_node->zoom == new_node->parent, true);
 
-    window_manager_order_window_after_insert(&view, &window);
-
     TEST_CHECK(g_test_scripting_addition_order_window.count, 1);
     TEST_CHECK(g_test_scripting_addition_order_window.a_wid, 22);
     TEST_CHECK(g_test_scripting_addition_order_window.order, 1);

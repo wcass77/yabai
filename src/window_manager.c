@@ -297,31 +297,6 @@ void window_manager_add_managed_window(struct window_manager *wm, struct window 
     window_manager_purify_window(wm, window);
 }
 
-void window_manager_order_window_after_insert(struct view *view, struct window *window)
-{
-    if (view->layout != VIEW_BSP && view->layout != VIEW_STACK) return;
-
-    struct window_node *node = view_find_window_node(view, window->id);
-    if (!node) return;
-
-    if (node->window_count > 1) {
-        if (node->window_order[0] == window->id) {
-            scripting_addition_order_window(window->id, 1, node->window_order[1]);
-        }
-
-        return;
-    }
-
-    if (view->layout != VIEW_BSP || !node->parent) return;
-
-    struct window_node *sibling = window_node_is_left_child(node)
-                                ? node->parent->right
-                                : node->parent->left;
-    if (!sibling || !window_node_is_leaf(sibling) || !sibling->window_count) return;
-
-    scripting_addition_order_window(window->id, 1, sibling->window_order[0]);
-}
-
 enum window_op_error window_manager_adjust_window_ratio(struct window_manager *wm, struct window *window, int type, float ratio)
 {
     TIME_FUNCTION;
@@ -2750,7 +2725,6 @@ static void window_manager_check_for_windows_on_space(struct window_manager *wm,
 
             view_add_window_node(view, window);
             window_manager_adjust_layer(window, LAYER_BELOW);
-            window_manager_order_window_after_insert(view, window);
             window_manager_add_managed_window(wm, window, view);
             view_set_flag(view, VIEW_IS_DIRTY);
         }

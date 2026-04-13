@@ -245,7 +245,6 @@ static EVENT_HANDLER(APPLICATION_LAUNCHED)
 
                 window_manager_adjust_layer(window, LAYER_BELOW);
                 view_add_window_node_with_insertion_point(view, window, prev_window_id);
-                window_manager_order_window_after_insert(view, window);
                 window_manager_add_managed_window(&g_window_manager, window, view);
 
                 view_set_flag(view, VIEW_IS_DIRTY);
@@ -459,7 +458,6 @@ static EVENT_HANDLER(APPLICATION_VISIBLE)
 
             window_manager_adjust_layer(window, LAYER_BELOW);
             view_add_window_node_with_insertion_point(view, window, prev_window_id);
-            window_manager_order_window_after_insert(view, window);
             window_manager_add_managed_window(&g_window_manager, window, view);
 
             view_set_flag(view, VIEW_IS_DIRTY);
