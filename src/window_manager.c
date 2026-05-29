@@ -1393,21 +1393,30 @@ void window_manager_focus_window_without_raise(ProcessSerialNumber *window_psn, 
     window_manager_make_key_window(window_psn, window_id);
 }
 
+static bool window_manager_should_raise_focused_window(struct view *view, bool flushed_before_focus)
+{
+    return !view || view->layout != VIEW_SCROLL || !flushed_before_focus;
+}
+
 void window_manager_focus_window_with_raise(ProcessSerialNumber *window_psn, uint32_t window_id, AXUIElementRef window_ref)
 {
     TIME_FUNCTION;
 
     struct window *window = window_manager_find_window(&g_window_manager, window_id);
     struct view *view = window ? window_manager_find_managed_window(&g_window_manager, window) : NULL;
+    bool flushed_before_focus = false;
     if (view && view->layout == VIEW_SCROLL &&
         (view_set_focused_window(view, window_id) || view_is_dirty(view))) {
         view_flush(view);
+        flushed_before_focus = true;
     }
 
 #if 1
     _SLPSSetFrontProcessWithOptions(window_psn, window_id, kCPSUserGenerated);
     window_manager_make_key_window(window_psn, window_id);
-    AXUIElementPerformAction(window_ref, kAXRaiseAction);
+    if (window_manager_should_raise_focused_window(view, flushed_before_focus)) {
+        AXUIElementPerformAction(window_ref, kAXRaiseAction);
+    }
 #else
     scripting_addition_focus_window(window_id);
 #endif

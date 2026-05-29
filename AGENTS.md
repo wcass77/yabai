@@ -47,11 +47,15 @@ Do not leave an interactive signing process running.
 ## yabai-dev
 
 This fork uses `yabai-dev` as its active local yabai launcher. See [doc/yabai-dev.md](doc/yabai-dev.md).
+The installed `yabai-dev` helper is a local script tracked in the user's dotfiles repo at `~/.config/yabai/dev/bin/yabai-dev`, not in this yabai repository.
 
 Important behavior:
 
 - `yabai-dev activate` builds, signs, updates sudoers, loads the scripting addition, and restarts launchd.
 - `yabai-dev activate --no-build` uses the existing `./bin/yabai` without rebuilding or re-signing it.
+- `yabai-dev build` builds, signs, points the stable symlink at this worktree, and stops before sudoers or launchd.
+- `yabai-dev activate --install-sudoers` installs sudoers for the current stable binary hash and may require an interactive sudo password.
+- `yabai-dev activate --restart-only` stops launchd, loads the scripting addition, restarts launchd, and verifies the current stable binary without rebuilding or updating sudoers.
 - Re-signing changes the binary sha256 and therefore invalidates the sudoers hash.
 - If sudoers installation fails, run the exact `sudo install ...` command printed by `yabai-dev`, then rerun `yabai-dev activate --no-build`.
 - Do not rerun plain `yabai-dev activate` after installing a printed sudoers file unless you intend to rebuild/re-sign and install a new sudoers hash.

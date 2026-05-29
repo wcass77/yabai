@@ -180,6 +180,28 @@ static bool scripting_addition_is_installed(void)
     return true;
 }
 
+static bool scripting_addition_file_matches(const char *path, unsigned char *bytes, unsigned int length)
+{
+    struct stat sb;
+    if (stat(path, &sb) != 0) return false;
+    if (sb.st_size != length) return false;
+
+    bool result = false;
+    FILE *handle = fopen(path, "rb");
+    if (!handle) return false;
+
+    unsigned char *buffer = malloc(length);
+    if (!buffer) goto out;
+
+    result = fread(buffer, 1, length, handle) == length &&
+             memcmp(buffer, bytes, length) == 0;
+    free(buffer);
+
+out:
+    fclose(handle);
+    return result;
+}
+
 static int scripting_addition_check(void)
 {
     bool result = 0;
@@ -190,8 +212,11 @@ static int scripting_addition_check(void)
         NSBundle *payload_bundle = [NSBundle bundleWithPath:payload_path];
         NSString *ns_version = [payload_bundle objectForInfoDictionaryKey:@"CFBundleVersion"];
 
-        bool status = string_equals([ns_version UTF8String], OSAX_VERSION);
-        result = status ? 0 : 1;
+        result = string_equals([ns_version UTF8String], OSAX_VERSION) &&
+                 scripting_addition_file_matches(osax_bin_loader, __src_osax_loader, __src_osax_loader_len) &&
+                 scripting_addition_file_matches(osax_bin_payload, __src_osax_payload, __src_osax_payload_len)
+               ? 0
+               : 1;
     } else {
         result = 1;
     }

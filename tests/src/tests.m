@@ -24,6 +24,7 @@ typedef TEST_SIG(function);
     TEST_ENTRY(scroll_viewport_centering_and_edge_peek)        \
     TEST_ENTRY(scroll_focus_index_after_removal)               \
     TEST_ENTRY(scroll_focus_state_is_idempotent)               \
+    TEST_ENTRY(scroll_focus_does_not_raise_during_proxy_animation) \
     TEST_ENTRY(scroll_step_rejects_unsupported_directions)     \
     TEST_ENTRY(scroll_background_insert_preserves_focus)        \
     TEST_ENTRY(scroll_focused_insert_updates_focus)             \

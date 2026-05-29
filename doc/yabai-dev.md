@@ -3,6 +3,7 @@
 `yabai-dev` is the development launcher used by this fork to build, sign, activate, and roll back local yabai worktrees. It keeps the user-facing `yabai` command stable while allowing the active binary to point at any checkout or worktree.
 
 This document describes the behavior of the `yabai-dev` helper currently installed at `~/.local/bin/yabai-dev`.
+The helper is a local script tracked outside this repository in the user's dotfiles repo at `~/.config/yabai/dev/bin/yabai-dev`.
 
 ## Paths
 
@@ -53,9 +54,29 @@ Options:
 | Option | Behavior |
 | --- | --- |
 | `--no-build` | Use the existing `./bin/yabai` instead of rebuilding or re-signing. |
+| `--install-sudoers` | Install `/private/etc/sudoers.d/yabai` for the current stable binary hash, then stop. |
+| `--restart-only` | Load the scripting addition, restart launchd, and verify the current stable binary. |
 | `--debug` | Build with `make all` instead of `make install`. |
 | `--identity NAME` | Codesign with `NAME` instead of `yabai-cert`. |
 | `--no-restart` | Activate files and state but skip launchd restart. |
+
+### `yabai-dev build [options]`
+
+Builds and signs the current checkout, points the stable symlink at the checkout's `bin/yabai`, updates dev state files, and stops before sudoers installation or launchd restart.
+
+This is intended for non-interactive agent workflows where the user must enter a sudo password manually:
+
+```sh
+cd /path/to/yabai
+yabai-dev build
+```
+
+Options:
+
+| Option | Behavior |
+| --- | --- |
+| `--debug` | Build with `make all` instead of `make install`. |
+| `--identity NAME` | Codesign with `NAME` instead of `yabai-cert`. |
 
 ### `yabai-dev rebuild`
 
@@ -120,12 +141,37 @@ Activation performs these steps in order:
 5. Point `~/.config/yabai/dev/bin/yabai` at the checkout's `bin/yabai`.
 6. Generate a sudoers line for the active binary hash.
 7. Install `/private/etc/sudoers.d/yabai`.
-8. Run `sudo -n ~/.config/yabai/dev/bin/yabai --load-sa`.
-9. Update dev state files.
-10. Restart launchd unless `--no-restart` is supplied.
-11. Verify `query --displays`.
+8. Update dev state files.
+9. Stop the current launchd service unless `--no-restart` is supplied.
+10. Run `sudo -n ~/.config/yabai/dev/bin/yabai --load-sa`, retrying briefly while Dock restarts.
+11. Start launchd unless `--no-restart` is supplied.
+12. Verify `query --displays`.
 
 The sudoers rule is hash-bound. Re-signing the binary changes the hash, even when the source code did not change. Use `--no-build` when you need to preserve the existing binary hash.
+
+## Split Agent Workflow
+
+Use this sequence when an agent can build and sign the binary, but the user needs to install the sudoers file interactively:
+
+1. Agent builds, signs, switches the stable symlink, and updates state:
+
+   ```sh
+   yabai-dev build
+   ```
+
+2. User installs sudoers for the stable binary hash:
+
+   ```sh
+   yabai-dev activate --install-sudoers
+   ```
+
+3. Agent finishes activation without rebuilding or touching sudoers. This stops the old service before loading the scripting addition so the previous `dock_did_restart` signal cannot race the new payload load:
+
+   ```sh
+   yabai-dev activate --restart-only
+   ```
+
+`--install-sudoers` can be run from any directory because it uses `~/.config/yabai/dev/bin/yabai`. `build` still must be run from a yabai checkout root.
 
 ## Sudoers Recovery
 

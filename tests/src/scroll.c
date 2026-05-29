@@ -108,6 +108,18 @@ TEST_FUNC(scroll_focus_state_is_idempotent,
     buf_free(view.scroll.column_list);
 });
 
+TEST_FUNC(scroll_focus_does_not_raise_during_proxy_animation,
+{
+    struct view view = {0};
+    view.layout = VIEW_SCROLL;
+
+    TEST_CHECK(window_manager_should_raise_focused_window(&view, true), false);
+    TEST_CHECK(window_manager_should_raise_focused_window(&view, false), true);
+    view.layout = VIEW_BSP;
+    TEST_CHECK(window_manager_should_raise_focused_window(&view, true), true);
+    TEST_CHECK(window_manager_should_raise_focused_window(NULL, true), true);
+});
+
 TEST_FUNC(scroll_step_rejects_unsupported_directions,
 {
     struct view view = {0};
