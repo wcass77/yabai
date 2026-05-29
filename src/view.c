@@ -905,6 +905,35 @@ void view_stack_window_node(struct window_node *node, struct window *window)
     ++node->window_count;
 }
 
+static void view_order_window_after_insert(struct view *view, struct window *window)
+{
+    if (view->layout != VIEW_BSP && view->layout != VIEW_STACK) return;
+
+    struct window_node *node = view_find_window_node(view, window->id);
+    if (!node) return;
+
+    if (node->window_count > 1) {
+        if (node->window_order[0] == window->id) {
+            if (!scripting_addition_order_window(window->id, 1, node->window_order[1])) {
+                daemon_fail(stderr, "scripting-addition order rejected for window %u during stack insert.\n", window->id);
+            }
+        }
+
+        return;
+    }
+
+    if (view->layout != VIEW_BSP || !node->parent) return;
+
+    struct window_node *sibling = window_node_is_left_child(node)
+                                ? node->parent->right
+                                : node->parent->left;
+    if (!sibling || !window_node_is_leaf(sibling) || !sibling->window_count) return;
+
+    if (!scripting_addition_order_window(window->id, 1, sibling->window_order[0])) {
+        daemon_fail(stderr, "scripting-addition order rejected for window %u during bsp insert.\n", window->id);
+    }
+}
+
 struct window_node *view_add_window_node_with_insertion_point(struct view *view, struct window *window, uint32_t insertion_point)
 {
     if (view_is_scroll_layout(view)) {
@@ -976,6 +1005,7 @@ struct window_node *view_add_window_node_with_insertion_point(struct view *view,
 
                 if (do_stack) {
                     view_stack_window_node(leaf, window);
+                    view_order_window_after_insert(view, window);
                     return leaf;
                 }
             }
@@ -994,6 +1024,7 @@ struct window_node *view_add_window_node_with_insertion_point(struct view *view,
         }
 
         window_node_split(view, leaf, window);
+        view_order_window_after_insert(view, window);
 
         if (view->auto_balance != SPLIT_NONE) {
             window_node_balance(view->root, view->auto_balance);
@@ -1004,6 +1035,7 @@ struct window_node *view_add_window_node_with_insertion_point(struct view *view,
         return leaf;
     } else if (view->layout == VIEW_STACK) {
         view_stack_window_node(view->root, window);
+        view_order_window_after_insert(view, window);
         return view->root;
     }
 
