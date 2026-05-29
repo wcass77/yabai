@@ -39,6 +39,11 @@ Additional features of yabai include focus-follows-mouse, disabling animations f
 - Sample configuration files can be found in the [&nearr;&nbsp;examples][yabai-examples] directory. Refer to the [&nearr;&nbsp;documentation][yabai-docs] or the wiki for further information.
 - Keyboard shortcuts can be defined with [&nearr;&nbsp;skhd][gh-skhd] or any other suitable software you may prefer.
 
+## Fork Documentation
+
+- [yabai-dev](doc/yabai-dev.md) documents the development launcher used by this fork to build, sign, activate, and roll back local yabai worktrees.
+- [Scroll Layout](doc/scroll-layout.md) documents the horizontally scrolling workspace layout behavior in this fork.
+
 ## Requirements and Caveats
 
 Please read the below requirements carefully.
